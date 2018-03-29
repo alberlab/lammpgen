@@ -38,19 +38,9 @@ FixEllipsoidalEnvelope::FixEllipsoidalEnvelope(LAMMPS *lmp, int narg, char **arg
   b = force->numeric(FLERR,arg[4]);
   c = force->numeric(FLERR,arg[5]);
 
-  max_axis = max( max(a, b), c );
-
   a2 = a*a;
   b2 = b*b;
   c2 = c*c;
-
-  a4 = a2*a2;
-  b4 = b2*b2;
-  c4 = c2*c2;
-
-  a6 = a4*a2;
-  b6 = b4*b2;
-  c6 = c4*c2;
 
 }
 
@@ -98,8 +88,8 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
   int nlocal = atom->nlocal;
 
   double dot;
-  double v[3], xs[3], x2[3], k2, k4, k6;
-  double t, d2, nrm;
+  double v[3], x2[3], k2;
+  double t;
   
   for (int i = 0; i < nlocal; i++)
 
@@ -110,44 +100,29 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
       x2[2] = x[i][2]*x[i][2];
 
       k2 = x2[0]/a2 + x2[1]/b2 + x2[2]/c2;
-      k4 = x2[0]/a4 + x2[1]/b4 + x2[2]/c4;
-      k6 = x2[0]/a6 + x2[1]/b6 + x2[2]/c6;
+      
 
       if ( k2 > 1 )  {
         
         // k2 > 1 means the point is outside the ellipse
-
-        d2 = k4*k4 - k6*(k2 - 1);
         
-        if ( d2 < 0 ) {
-
-          // if the point is far away from the ellipse, it may happen that
-          // the gradient direction does not intersect the ellipse itself.
-          // In that case we push towards the center
-
-          v[0] = -x[i][0];
-          v[1] = -x[i][1];
-          v[2] = -x[i][2];
-          nrm = sqrt( x[i][0]*x[i][0] + x[i][1]*x[i][1] + x[i][2]*x[i][2] );
-          t = 1.0 - max_axis / nrm;
-
-        } else {
-
-          // we are close enough to the ellipse to have a solution, we 
-          // follow the gradient
-
-          v[0] = -x[i][0]/a2;
-          v[1] = -x[i][1]/b2;
-          v[2] = -x[i][2]/c2;
-          t = ( k4 - sqrt( d2 ) ) / k6;   
+        // The gradient is -(x/a^2, y/b^2, z/c^2)
+        // The minimal distance to the ellipsodal is difficult to solve
+        // However we can approximate the distance using a cooresponding point
+        // on the surface scaled by 1/sqrt(x^2/a^2 + y^2/b^2 + z^2/c^2) = 1/sqrt(k2)
+        // t = (1-1/sqrt(k2))*|(x,y,z)|
         
-        }
 
+        v[0] = -x[i][0]/a2;
+        v[1] = -x[i][1]/b2;
+        v[2] = -x[i][2]/c2;
+        t = (1 - 1/sqrt(k2))*sqrt(x2[0]+x2[1]+x2[2]);   
+        
         f[i][0] += t * v[0];
         f[i][1] += t * v[1];
         f[i][2] += t * v[2];
       
-      } 
+      }
       
     }
     

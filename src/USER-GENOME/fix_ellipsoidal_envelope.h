@@ -35,7 +35,7 @@ class FixEllipsoidalEnvelope : public Fix {
   void min_post_force(int);
 
  private:
-  double a, b, c, a2, b2, c2, a4, b4, c4, a6, b6, c6, max_axis;
+  double a, b, c, a2, b2, c2;
 };
 
 }
