@@ -27,6 +27,13 @@ namespace LAMMPS_NS {
 class FixEllipsoidalEnvelope : public Fix {
  public:
   FixEllipsoidalEnvelope(class LAMMPS *, int, char **);
+  virtual ~FixEllipsoidalEnvelope();
+  virtual double memory_usage();
+  virtual void grow_arrays(int);
+  virtual void copy_arrays(int, int, int);
+  virtual void set_arrays(int);
+  virtual int pack_exchange(int, double*);
+  virtual int unpack_exchange(int, double*);
   int setmask();
   void setup(int);
   void min_setup(int);
@@ -35,7 +42,9 @@ class FixEllipsoidalEnvelope : public Fix {
   void min_post_force(int);
 
  private:
-  double a, b, c, a2, b2, c2;
+  double a, b, c, a2, b2, c2, kspring;
+  double* radius;
+  double** v2r;
 };
 
 }

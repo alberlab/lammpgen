@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include "fix_ellipsoidal_envelope.h"
 #include "atom.h"
+#include "memory.h"
 #include "update.h"
 #include "respa.h"
 #include "error.h"
@@ -33,26 +34,93 @@ FixEllipsoidalEnvelope::FixEllipsoidalEnvelope(LAMMPS *lmp, int narg, char **arg
 {
   dynamic_group_allow = 1;
 
-  if (narg != 6) error->all(FLERR,"Illegal fix planeforce command");
+  if (narg != 7) error->all(FLERR,"Illegal fix ellipsodal envelope command [args: a, b, c, k]");
   a = force->numeric(FLERR,arg[3]);
   b = force->numeric(FLERR,arg[4]);
   c = force->numeric(FLERR,arg[5]);
+  kspring = force->numeric(FLERR,arg[6]);
 
   a2 = a*a;
   b2 = b*b;
   c2 = c*c;
 
+  int dflag = 0;
+  int index = atom->find_custom("radius", dflag);
+  radius = atom->dvector[index];
+
+  memory->create(this->v2r, atom->nmax, 3, "FixEllipsoidalEnvelope:v2r");
+
+  for (int i = 0; i < atom->nmax; ++i){
+
+    v2r[i][0] = (a - radius[i])*(a - radius[i]);
+    v2r[i][1] = (b - radius[i])*(b - radius[i]);
+    v2r[i][2] = (c - radius[i])*(c - radius[i]);
+
+  }
+
+  atom->add_callback(0);
 }
 
 /* ---------------------------------------------------------------------- */
 
-int FixEllipsoidalEnvelope::setmask()
-{
+FixEllipsoidalEnvelope::~FixEllipsoidalEnvelope() {
+  memory->destroy(v2r);
+  atom->delete_callback(id, 0);
+}
+
+/* ---------------------------------------------------------------------- */
+
+int FixEllipsoidalEnvelope::setmask() {
   int mask = 0;
   mask |= POST_FORCE;
   mask |= POST_FORCE_RESPA;
   mask |= MIN_POST_FORCE;
   return mask;
+}
+
+/* ---------------------------------------------------------------------- */
+
+double FixEllipsoidalEnvelope::memory_usage()
+{
+  int nmax = atom->nmax;
+  double bytes = 0.0;
+  bytes += nmax * 3 * sizeof(double);
+  return bytes;
+}
+
+/* ---------------------------------------------------------------------- */
+
+void FixEllipsoidalEnvelope::grow_arrays(int nmax)
+{
+  memory->grow(this->v2r, nmax, 3, "FixEllipsoidalEnvelope:v2r");
+}
+
+void FixEllipsoidalEnvelope::copy_arrays(int i, int j, int delflag)
+{
+  memcpy(this->v2r[j], this->v2r[i], sizeof(double) * 3);
+}
+
+void FixEllipsoidalEnvelope::set_arrays(int i)
+{
+  memset(this->v2r[i], 0, sizeof(double) * 3);
+}
+
+int FixEllipsoidalEnvelope::pack_exchange(int i, double *buf)
+{
+  int m = 0;
+  buf[m++] = v2r[i][0];
+  buf[m++] = v2r[i][1];
+  buf[m++] = v2r[i][2];
+  return m;
+}
+
+int FixEllipsoidalEnvelope::unpack_exchange(int nlocal, double *buf)
+{
+  int m = 0;
+  v2r[nlocal][0] = buf[m++];
+  v2r[nlocal][1] = buf[m++];
+  v2r[nlocal][2] = buf[m++];
+  return m;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -90,42 +158,48 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
   double dot;
   double v[3], x2[3], k2;
   double t;
-  
-  for (int i = 0; i < nlocal; i++)
+
+
+  for (int i = 0; i < nlocal; i++) {
 
     if (mask[i] & groupbit) {
-      
+
       x2[0] = x[i][0]*x[i][0];
       x2[1] = x[i][1]*x[i][1];
       x2[2] = x[i][2]*x[i][2];
 
-      k2 = x2[0]/a2 + x2[1]/b2 + x2[2]/c2;
-      
+      k2 = x2[0]/v2r[i][0] + x2[1]/v2r[i][1] + x2[2]/v2r[i][2];
 
       if ( k2 > 1 )  {
-        
+
         // k2 > 1 means the point is outside the ellipse
-        
+
         // The gradient is -(x/a^2, y/b^2, z/c^2)
         // The minimal distance to the ellipsodal is difficult to solve
         // However we can approximate the distance using a cooresponding point
         // on the surface scaled by 1/sqrt(x^2/a^2 + y^2/b^2 + z^2/c^2) = 1/sqrt(k2)
         // t = (1-1/sqrt(k2))*|(x,y,z)|
-        
 
-        v[0] = -x[i][0]/a2;
-        v[1] = -x[i][1]/b2;
-        v[2] = -x[i][2]/c2;
-        t = (1 - 1/sqrt(k2))*sqrt(x2[0]+x2[1]+x2[2]);   
-        
-        f[i][0] += t * v[0];
-        f[i][1] += t * v[1];
-        f[i][2] += t * v[2];
-      
+
+        v[0] = -x[i][0]/v2r[i][0];
+        v[1] = -x[i][1]/v2r[i][1];
+        v[2] = -x[i][2]/v2r[i][2];
+        t = (1 - 1/sqrt(k2))*sqrt(x2[0]+x2[1]+x2[2]) - radius[i];
+
+        if(t > 0){
+
+          f[i][0] += t * v[0] * kspring;
+          f[i][1] += t * v[1] * kspring;
+          f[i][2] += t * v[2] * kspring;
+
+        }
+
       }
-      
+
     }
-    
+
+  }
+
 }
 
 /* ---------------------------------------------------------------------- */
