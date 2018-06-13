@@ -28,10 +28,14 @@ using namespace FixConst;
 /* ---------------------------------------------------------------------- */
 
 double max(double x, double y) {return x>y? x: y;}
+double normsq3(double* x){ return sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2]); }
 
 FixEllipsoidalEnvelope::FixEllipsoidalEnvelope(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg)
 {
+  scalar_flag = 1;
+  //vector_flag = 1;
+  //size_vector = 1;
   dynamic_group_allow = 1;
 
   if (narg != 7) error->all(FLERR,"Illegal fix ellipsodal envelope command [args: a, b, c, k]");
@@ -49,6 +53,7 @@ FixEllipsoidalEnvelope::FixEllipsoidalEnvelope(LAMMPS *lmp, int narg, char **arg
   radius = atom->dvector[index];
 
   memory->create(this->v2r, atom->nmax, 3, "FixEllipsoidalEnvelope:v2r");
+  memory->create(this->ftotal, atom->nmax, "FixEllipsoidalEnvelope:ftotal");
 
   for (int i = 0; i < atom->nmax; ++i){
 
@@ -58,6 +63,8 @@ FixEllipsoidalEnvelope::FixEllipsoidalEnvelope(LAMMPS *lmp, int narg, char **arg
 
   }
 
+  etotal = 0;
+
   atom->add_callback(0);
 }
 
@@ -65,6 +72,7 @@ FixEllipsoidalEnvelope::FixEllipsoidalEnvelope(LAMMPS *lmp, int narg, char **arg
 
 FixEllipsoidalEnvelope::~FixEllipsoidalEnvelope() {
   memory->destroy(v2r);
+  memory->destroy(ftotal);
   atom->delete_callback(id, 0);
 }
 
@@ -73,6 +81,7 @@ FixEllipsoidalEnvelope::~FixEllipsoidalEnvelope() {
 int FixEllipsoidalEnvelope::setmask() {
   int mask = 0;
   mask |= POST_FORCE;
+  mask |= THERMO_ENERGY;
   mask |= POST_FORCE_RESPA;
   mask |= MIN_POST_FORCE;
   return mask;
@@ -158,10 +167,11 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
   double dot;
   double v[3], x2[3], k2;
   double t;
+  double vnormsq;
 
-
+  etotal = 0;
   for (int i = 0; i < nlocal; i++) {
-
+    ftotal[i] = 0;
     if (mask[i] & groupbit) {
 
       x2[0] = x[i][0]*x[i][0];
@@ -184,10 +194,13 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
         v[0] = -x[i][0]/v2r[i][0];
         v[1] = -x[i][1]/v2r[i][1];
         v[2] = -x[i][2]/v2r[i][2];
-        t = (1 - 1/sqrt(k2))*sqrt(x2[0]+x2[1]+x2[2]) - radius[i];
+        t = (1 - 1/sqrt(k2))*sqrt(x2[0]+x2[1]+x2[2]);
 
         if(t > 0){
 
+          vnormsq = normsq3(v);
+          ftotal[i] = t * sqrt(vnormsq) * kspring; //0.5 * t * t * vnormsq * kspring; //
+          etotal += ftotal[i];
           f[i][0] += t * v[0] * kspring;
           f[i][1] += t * v[1] * kspring;
           f[i][2] += t * v[2] * kspring;
@@ -214,4 +227,16 @@ void FixEllipsoidalEnvelope::post_force_respa(int vflag, int ilevel, int iloop)
 void FixEllipsoidalEnvelope::min_post_force(int vflag)
 {
   post_force(vflag);
+}
+
+double FixEllipsoidalEnvelope::compute_scalar()
+{
+
+  return etotal;
+}
+
+
+double FixEllipsoidalEnvelope::compute_vector(int n)
+{
+  return ftotal[n];
 }

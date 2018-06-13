@@ -40,11 +40,15 @@ class FixEllipsoidalEnvelope : public Fix {
   void post_force(int);
   void post_force_respa(int, int, int);
   void min_post_force(int);
+  double compute_scalar();
+  double compute_vector(int);
 
  private:
   double a, b, c, a2, b2, c2, kspring;
   double* radius;
   double** v2r;
+  double etotal;
+  double* ftotal;
 };
 
 }
