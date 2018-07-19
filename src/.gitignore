@@ -1141,3 +1141,12 @@
 /pair_vashishta*.cpp
 /pair_vashishta*.h
 
+
+/add_bond.cpp
+/add_bond.h
+/bond_harmonic*.cpp
+/bond_harmonic*.h
+/fix_ellipsoidal_envelope.cpp
+/fix_ellipsoidal_envelope.h
+/remove_bond.cpp
+/remove_bond.h
