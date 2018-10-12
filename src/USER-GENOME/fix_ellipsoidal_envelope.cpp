@@ -180,7 +180,7 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
 
       k2 = x2[0]/v2r[i][0] + x2[1]/v2r[i][1] + x2[2]/v2r[i][2];
 
-      if ( k2 > 1 )  {
+      if ( ( k2 > 1 && kspring > 0 ) || ( k2 < 1 && kspring < 0 ) )  {
 
         // k2 > 1 means the point is outside the ellipse
 
@@ -196,16 +196,13 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
         v[2] = -x[i][2]/v2r[i][2];
         t = (1 - 1/sqrt(k2))*sqrt(x2[0]+x2[1]+x2[2]);
 
-        if(t > 0){
+        vnormsq = normsq3(v);
+        ftotal[i] = t * sqrt(vnormsq) * kspring; //0.5 * t * t * vnormsq * kspring; //
+        etotal += ftotal[i];
+        f[i][0] += t * v[0] * fabs(kspring);
+        f[i][1] += t * v[1] * fabs(kspring);
+        f[i][2] += t * v[2] * fabs(kspring);
 
-          vnormsq = normsq3(v);
-          ftotal[i] = t * sqrt(vnormsq) * kspring; //0.5 * t * t * vnormsq * kspring; //
-          etotal += ftotal[i];
-          f[i][0] += t * v[0] * kspring;
-          f[i][1] += t * v[1] * kspring;
-          f[i][2] += t * v[2] * kspring;
-
-        }
 
       }
 
