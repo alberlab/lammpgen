@@ -28,7 +28,7 @@ using namespace FixConst;
 /* ---------------------------------------------------------------------- */
 
 double max(double x, double y) {return x>y? x: y;}
-double normsq3(double* x){ return sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2]); }
+double norm3(double* x){ return sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2]); }
 
 FixEllipsoidalEnvelope::FixEllipsoidalEnvelope(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg)
@@ -171,7 +171,7 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
   double dot;
   double v[3], x2[3], k2;
   double t;
-  double vnormsq;
+  double vnorm;
 
   etotal = 0;
   for (int i = 0; i < nlocal; i++) {
@@ -200,12 +200,12 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
         v[2] = -x[i][2]/v2r[i][2];
         t = (1 - 1/sqrt(k2))*sqrt(x2[0]+x2[1]+x2[2]);
 
-        vnormsq = normsq3(v);
-        ftotal[i] = t * sqrt(vnormsq) * kspring; //0.5 * t * t * vnormsq * kspring; //
-        etotal += ftotal[i];
-        f[i][0] += t * v[0] * fabs(kspring);
-        f[i][1] += t * v[1] * fabs(kspring);
-        f[i][2] += t * v[2] * fabs(kspring);
+        vnorm = norm3(v);
+        ftotal[i] = t * kspring; //0.5 * t * t * vnormsq * kspring; //
+        etotal += 0.5 * t * t * kspring;
+        f[i][0] += t * v[0] * fabs(kspring) / vnorm;
+        f[i][1] += t * v[1] * fabs(kspring) / vnorm;
+        f[i][2] += t * v[2] * fabs(kspring) / vnorm;
 
 
       }
