@@ -56,15 +56,9 @@ FixEllipsoidalEnvelope::FixEllipsoidalEnvelope(LAMMPS *lmp, int narg, char **arg
   memory->create(this->ftotal, atom->nmax, "FixEllipsoidalEnvelope:ftotal");
 
   for (int i = 0; i < atom->nmax; ++i){
-    if (kspring > 0){
-      v2r[i][0] = (a - radius[i])*(a - radius[i]);
-      v2r[i][1] = (b - radius[i])*(b - radius[i]);
-      v2r[i][2] = (c - radius[i])*(c - radius[i]);
-    } else {
-      v2r[i][0] = (a + radius[i])*(a + radius[i]);
-      v2r[i][1] = (b + radius[i])*(b + radius[i]);
-      v2r[i][2] = (c + radius[i])*(c + radius[i]);
-    }
+    v2r[i][0] = (a - radius[i])*(a - radius[i]);
+    v2r[i][1] = (b - radius[i])*(b - radius[i]);
+    v2r[i][2] = (c - radius[i])*(c - radius[i]);
   }
 
   etotal = 0;
