@@ -1150,3 +1150,8 @@
 /fix_ellipsoidal_envelope.h
 /remove_bond.cpp
 /remove_bond.h
+/pair_excluded_volume.cpp
+/pair_excluded_volume.h
+/bond_hic.cpp
+/bond_hic.h
+
