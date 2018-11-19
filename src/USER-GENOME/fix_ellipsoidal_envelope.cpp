@@ -64,6 +64,7 @@ FixEllipsoidalEnvelope::FixEllipsoidalEnvelope(LAMMPS *lmp, int narg, char **arg
   etotal = 0;
 
   atom->add_callback(0);
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -195,11 +196,12 @@ void FixEllipsoidalEnvelope::post_force(int vflag)
         t = (1 - 1/sqrt(k2))*sqrt(x2[0]+x2[1]+x2[2]);
 
         vnorm = norm3(v);
-        ftotal[i] = t * kspring; //0.5 * t * t * vnormsq * kspring; //
-        etotal += 0.5 * t * t * kspring;
-        f[i][0] += t * v[0] * fabs(kspring) / vnorm;
-        f[i][1] += t * v[1] * fabs(kspring) / vnorm;
-        f[i][2] += t * v[2] * fabs(kspring) / vnorm;
+        float abs_kspring = fabs(kspring);
+        ftotal[i] = t * abs_kspring; //0.5 * t * t * vnormsq * kspring; //
+        etotal += 0.5 * t * t * abs_kspring;
+        f[i][0] += t * v[0] * abs_kspring / vnorm;
+        f[i][1] += t * v[1] * abs_kspring / vnorm;
+        f[i][2] += t * v[2] * abs_kspring / vnorm;
 
 
       }
