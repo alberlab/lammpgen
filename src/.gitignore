@@ -1154,4 +1154,5 @@
 /pair_excluded_volume.h
 /bond_hic.cpp
 /bond_hic.h
+/fix_volumetric_restraint.*
 
