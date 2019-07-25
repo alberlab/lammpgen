@@ -11,10 +11,10 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include "pair_thole.h"
 #include "atom.h"
 #include "comm.h"
@@ -64,8 +64,7 @@ void PairThole::compute(int eflag, int vflag)
   double dcoul,asr,exp_asr;
 
   ecoul = 0.0;
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   double **x = atom->x;
   double **f = atom->f;
@@ -363,7 +362,7 @@ void PairThole::read_restart_settings(FILE *fp)
 /* ---------------------------------------------------------------------- */
 
 double PairThole::single(int i, int j, int itype, int jtype,
-                         double rsq, double factor_coul, double factor_lj,
+                         double rsq, double factor_coul, double /*factor_lj*/,
                          double &fforce)
 {
   double r2inv,rinv,r,phicoul;
@@ -414,7 +413,7 @@ double PairThole::single(int i, int j, int itype, int jtype,
 
 void *PairThole::extract(const char *str, int &dim)
 {
-  dim = 4;
+  dim = 2;
   if (strcmp(str,"scale") == 0) return (void *) scale;
   if (strcmp(str,"polar") == 0) return (void *) polar;
   if (strcmp(str,"thole") == 0) return (void *) thole;

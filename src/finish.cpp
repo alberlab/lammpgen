@@ -12,10 +12,10 @@
 ------------------------------------------------------------------------- */
 
 #include <mpi.h>
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <cstdio>
 #include "finish.h"
 #include "timer.h"
 #include "universe.h"
@@ -35,6 +35,7 @@
 #include "output.h"
 #include "memory.h"
 #include "error.h"
+#include "utils.h"
 
 #ifdef LMP_USER_OMP
 #include "modify.h"
@@ -101,7 +102,7 @@ void Finish::end(int flag)
     if (update->whichflag == 1 &&
         strncmp(update->integrate_style,"verlet/split",12) == 0 &&
         universe->iworld == 1) neighflag = 0;
-    if (force->kspace && force->kspace_match("pppm",0)
+    if (force->kspace && force->kspace_match("^pppm",0)
         && force->kspace->fftbench) fftflag = 1;
   }
   if (flag == 2) prdflag = timeflag = histoflag = neighflag = 1;

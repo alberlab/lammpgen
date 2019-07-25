@@ -16,8 +16,8 @@
    [ based on dihedral_helix.cpp Paul Crozier (SNL) ]
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdlib>
 #include "dihedral_quadratic.h"
 #include "atom.h"
 #include "neighbor.h"
@@ -38,7 +38,10 @@ using namespace MathConst;
 
 /* ---------------------------------------------------------------------- */
 
-DihedralQuadratic::DihedralQuadratic(LAMMPS *lmp) : Dihedral(lmp) {}
+DihedralQuadratic::DihedralQuadratic(LAMMPS *lmp) : Dihedral(lmp)
+{
+  writedata = 1;
+}
 
 /* ---------------------------------------------------------------------- */
 
@@ -65,8 +68,7 @@ void DihedralQuadratic::compute(int eflag, int vflag)
   double s2,cx,cy,cz,cmag,dx,phi,si,siinv,sin2;
 
   edihedral = 0.0;
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = 0;
+  ev_init(eflag,vflag);
 
   double **x = atom->x;
   double **f = atom->f;
@@ -333,3 +335,12 @@ void DihedralQuadratic::read_restart(FILE *fp)
   for (int i = 1; i <= atom->ndihedraltypes; i++) setflag[i] = 1;
 }
 
+/* ----------------------------------------------------------------------
+   proc 0 writes to data file
+------------------------------------------------------------------------- */
+
+void DihedralQuadratic::write_data(FILE *fp)
+{
+  for (int i = 1; i <= atom->ndihedraltypes; i++)
+    fprintf(fp,"%d %g %g \n",i,k[i],phi0[i]*180.0/MY_PI);
+}

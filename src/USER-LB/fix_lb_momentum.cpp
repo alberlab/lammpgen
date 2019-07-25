@@ -18,8 +18,8 @@
    Contributing author: Naveen Michaud-Agrawal (Johns Hopkins U)
 ------------------------------------------------------------------------- */
 
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 #include "fix_lb_momentum.h"
 #include "atom.h"
 #include "domain.h"
@@ -102,8 +102,8 @@ void FixLbMomentum::end_of_step()
   double masslb,masslbloc;
   double momentumlbloc[3],momentumlb[3];
   double vcmtotal[3];
-  int numvel = fix_lb_fluid->numvel;
-  double etacov[numvel];
+  const int numvel = fix_lb_fluid->numvel;
+  double etacov[19]; // = double etacov[numvel]; i.e. 15 or 19
   double rho;
 
   if (linear) {
@@ -201,7 +201,7 @@ void FixLbMomentum::end_of_step()
                             ucmx*u_lb[i][j][k][1]*ucmz-ucmx*ucmy*u_lb[i][j][k][2]+
                             ucmx*ucmy*ucmz);
             etacov[14]=0.0;
-          }else{
+          } else {
             etacov[0] = 0.0;
             etacov[1] = rho*ucmx;
             etacov[2] = rho*ucmy;
@@ -263,7 +263,7 @@ void FixLbMomentum::end_of_step()
                                       ucmx*u_old[1]*ucmz-ucmx*ucmy*u_old[2]+
                                       ucmx*ucmy*ucmz);
               etacov[14]=0.0;
-            }else{
+            } else {
               etacov[0] = 0.0;
               etacov[1] = density_old*ucmx;
               etacov[2] = density_old*ucmy;

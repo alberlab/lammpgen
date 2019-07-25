@@ -22,10 +22,10 @@
 ------------------------------------------------------------------------------------------- */
 
 #include <mpi.h>
-#include <math.h>
+#include <cmath>
 #include "math_const.h"
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 #include "pair_multi_lucy_rx_kokkos.h"
 #include "atom_kokkos.h"
 #include "force.h"
@@ -148,8 +148,7 @@ void PairMultiLucyRXKokkos<DeviceType>::compute_style(int eflag_in, int vflag_in
   vflag = vflag_in;
 
   if (neighflag == FULL) no_virial_fdotr_compute = 1;
-  if (eflag || vflag) ev_setup(eflag,vflag,0);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag,0);
 
   // reallocate per-atom arrays if necessary
 
@@ -993,7 +992,7 @@ void PairMultiLucyRXKokkos<DeviceType>::settings(int narg, char **arg)
 
 namespace LAMMPS_NS {
 template class PairMultiLucyRXKokkos<LMPDeviceType>;
-#ifdef KOKKOS_HAVE_CUDA
+#ifdef KOKKOS_ENABLE_CUDA
 template class PairMultiLucyRXKokkos<LMPHostType>;
 #endif
 }

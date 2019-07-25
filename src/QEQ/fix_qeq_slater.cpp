@@ -15,10 +15,10 @@
    Contributing author: Ray Shan (Sandia)
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include "fix_qeq_slater.h"
 #include "atom.h"
 #include "comm.h"
@@ -107,16 +107,16 @@ void FixQEqSlater::extract_streitz()
 
 /* ---------------------------------------------------------------------- */
 
-void FixQEqSlater::pre_force(int vflag)
+void FixQEqSlater::pre_force(int /*vflag*/)
 {
   if (update->ntimestep % nevery) return;
 
   nlocal = atom->nlocal;
   nall = atom->nlocal + atom->nghost;
 
-  if( atom->nmax > nmax ) reallocate_storage();
+  if (atom->nmax > nmax) reallocate_storage();
 
-  if( nlocal > n_cap*DANGER_ZONE || m_fill > m_cap*DANGER_ZONE )
+  if (nlocal > n_cap*DANGER_ZONE || m_fill > m_cap*DANGER_ZONE)
     reallocate_matrix();
 
   init_matvec();

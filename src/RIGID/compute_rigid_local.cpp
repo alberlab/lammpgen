@@ -11,8 +11,8 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <string.h>
+#include <cmath>
+#include <cstring>
 #include "compute_rigid_local.h"
 #include "atom.h"
 #include "update.h"
@@ -40,8 +40,6 @@ ComputeRigidLocal::ComputeRigidLocal(LAMMPS *lmp, int narg, char **arg) :
 
   local_flag = 1;
   nvalues = narg - 4;
-  if (nvalues == 1) size_local_cols = 0;
-  else size_local_cols = nvalues;
 
   int n = strlen(arg[3]) + 1;
   idrigid = new char[n];
@@ -88,7 +86,10 @@ ComputeRigidLocal::ComputeRigidLocal(LAMMPS *lmp, int narg, char **arg) :
     else error->all(FLERR,"Invalid keyword in compute rigid/local command");
   }
 
-  ncount = nmax = 0;
+  if (nvalues == 1) size_local_cols = 0;
+  else size_local_cols = nvalues;
+
+ncount = nmax = 0;
   vlocal = NULL;
   alocal = NULL;
 }

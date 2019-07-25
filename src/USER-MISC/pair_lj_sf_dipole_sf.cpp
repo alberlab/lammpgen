@@ -16,8 +16,9 @@
                          Samuel Genheden (University of Southampton)
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include "pair_lj_sf_dipole_sf.h"
 #include "atom.h"
 #include "neighbor.h"
@@ -27,7 +28,6 @@
 #include "memory.h"
 #include "error.h"
 #include "update.h"
-#include <string.h>
 
 using namespace LAMMPS_NS;
 
@@ -79,8 +79,7 @@ void PairLJSFDipoleSF::compute(int eflag, int vflag)
   int *ilist,*jlist,*numneigh,**firstneigh;
 
   evdwl = ecoul = 0.0;
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   double **x = atom->x;
   double **f = atom->f;
@@ -539,7 +538,7 @@ double PairLJSFDipoleSF::single(int i, int j, int itype, int jtype, double rsq,
                                 double &fforce)
 {
   double r2inv,r6inv;
-  double pdotp,pidotr,pjdotr,pre1,delx,dely,delz;
+  double pdotp,pidotr,pjdotr,delx,dely,delz;
   double rinv, r3inv,r5inv, rcutlj2inv, rcutcoul2inv,rcutlj6inv;
   double qtmp,xtmp,ytmp,ztmp,bfac,pqfac,qpfac, ecoul, evdwl;
 

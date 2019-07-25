@@ -68,6 +68,9 @@ do
     --cxxflags*)
       CXXFLAGS="${key#*=}"
       ;;
+    --cxxstandard*)
+      KOKKOS_CXX_STANDARD="${key#*=}"
+      ;;
     --ldflags*)
       LDFLAGS="${key#*=}"
       ;;
@@ -97,12 +100,21 @@ do
         echo "Invalid compiler by --compiler command: '${COMPILER}'"
         exit
       fi
+      # ... valid compiler, ensure absolute path set 
+      WCOMPATH=`which $COMPILER`
+      COMPDIR=`dirname $WCOMPATH`
+      COMPNAME=`basename $WCOMPATH`
+      COMPILER=${COMPDIR}/${COMPNAME}
       ;;
     --with-options*)
       KOKKOS_OPT="${key#*=}"
       ;;
+    --gcc-toolchain*)
+      KOKKOS_GCC_TOOLCHAIN="${key#*=}"
+      ;;
     --help)
       echo "Kokkos configure options:"
+      echo ""
       echo "--kokkos-path=/Path/To/Kokkos:        Path to the Kokkos root directory."
       echo "--qthreads-path=/Path/To/Qthreads:    Path to Qthreads install directory."
       echo "                                        Overrides path given by --with-qthreads."
@@ -118,6 +130,7 @@ do
       echo "--arch=[OPT]:  Set target architectures. Options are:"
       echo "               [AMD]"
       echo "                 AMDAVX          = AMD CPU"
+      echo "                 EPYC            = AMD EPYC Zen-Core CPU"
       echo "               [ARM]"
       echo "                 ARMv80          = ARMv8.0 Compatible CPU"
       echo "                 ARMv81          = ARMv8.1 Compatible CPU"
@@ -156,6 +169,8 @@ do
       echo "                                build.  This will still set certain required"
       echo "                                flags via KOKKOS_CXXFLAGS (such as -fopenmp,"
       echo "                                --std=c++11, etc.)."
+      echo "--cxxstandard=[FLAGS]         Overwrite KOKKOS_CXX_STANDARD for library build and test"
+      echo "                                c++11 (default), c++14, c++17, c++1y, c++1z, c++2a"
       echo "--ldflags=[FLAGS]             Overwrite LDFLAGS for library build and test"
       echo "                                build. This will still set certain required"
       echo "                                flags via KOKKOS_LDFLAGS (such as -fopenmp,"
@@ -171,6 +186,7 @@ do
       echo "                                "
       echo "--with-cuda-options=[OPT]:    Additional options to CUDA:"
       echo "                                force_uvm, use_ldg, enable_lambda, rdc"
+      echo "--gcc-toolchain=/Path/To/GccRoot:  Set the gcc toolchain to use with clang (e.g. /usr)" 
       echo "--make-j=[NUM]:               DEPRECATED: call make with appropriate"
       echo "                                -j flag"
       exit 0
@@ -195,7 +211,7 @@ else
 fi
 
 if [ "${KOKKOS_PATH}"  = "${PWD}" ] || [ "${KOKKOS_PATH}"  = "${PWD}/" ]; then
-  echo "Running generate_makefile.sh in the Kokkos root directory is not allowed"
+  echo "Running generate_makefile.bash in the Kokkos root directory is not allowed"
   exit
 fi
 
@@ -204,8 +220,13 @@ KOKKOS_SRC_PATH=${KOKKOS_PATH}
 KOKKOS_SETTINGS="KOKKOS_SRC_PATH=${KOKKOS_SRC_PATH}"
 #KOKKOS_SETTINGS="KOKKOS_PATH=${KOKKOS_PATH}"
 
+# The double [[  ]] in the elif branch is not a typo
 if [ ${#COMPILER} -gt 0 ]; then
   KOKKOS_SETTINGS="${KOKKOS_SETTINGS} CXX=${COMPILER}"
+elif
+   [ ${#COMPILER} -eq 0 ] && [[ ${KOKKOS_DEVICES} =~ .*Cuda.* ]]; then
+  COMPILER="${KOKKOS_PATH}/bin/nvcc_wrapper"
+  KOKKOS_SETTINGS="${KOKKOS_SETTINGS} CXX=${COMPILER}"   
 fi
 
 if [ ${#KOKKOS_DEVICES} -gt 0 ]; then
@@ -226,6 +247,10 @@ fi
 
 if [ ${#CXXFLAGS} -gt 0 ]; then
   KOKKOS_SETTINGS="${KOKKOS_SETTINGS} CXXFLAGS=\"${CXXFLAGS}\""
+fi
+
+if [ ${#KOKKOS_CXX_STANDARD} -gt 0 ]; then
+  KOKKOS_SETTINGS="${KOKKOS_SETTINGS} KOKKOS_CXX_STANDARD=\"${KOKKOS_CXX_STANDARD}\""
 fi
 
 if [ ${#LDFLAGS} -gt 0 ]; then
@@ -265,6 +290,10 @@ if [ ${#KOKKOS_CUDA_OPT} -gt 0 ]; then
   KOKKOS_SETTINGS="${KOKKOS_SETTINGS} KOKKOS_CUDA_OPTIONS=${KOKKOS_CUDA_OPT}"
 fi
 
+if [ ${#KOKKOS_GCC_TOOLCHAIN} -gt 0 ]; then
+  KOKKOS_SETTINGS="${KOKKOS_SETTINGS} KOKKOS_INTERNAL_GCC_TOOLCHAIN=${KOKKOS_GCC_TOOLCHAIN}"
+fi
+
 KOKKOS_SETTINGS_NO_KOKKOS_PATH="${KOKKOS_SETTINGS}"
 
 KOKKOS_TEST_INSTALL_PATH="${PWD}/install"
@@ -276,7 +305,7 @@ fi
 
 mkdir -p install
 gen_makefile=Makefile.kokkos
-echo "#Makefile to satisfy existens of target kokkos-clean before installing the library" > install/${gen_makefile}
+echo "#Makefile to satisfy existence of target kokkos-clean before installing the library" > install/${gen_makefile}
 echo "kokkos-clean:" >> install/${gen_makefile}
 echo "" >> install/${gen_makefile}
 mkdir -p core
@@ -292,6 +321,7 @@ mkdir -p example
 mkdir -p example/fixture
 mkdir -p example/feint
 mkdir -p example/fenl
+mkdir -p example/make_buildlink
 mkdir -p example/tutorial
 
 if [ ${#KOKKOS_ENABLE_EXAMPLE_ICHOL} -gt 0 ]; then
@@ -391,6 +421,17 @@ echo "" >> example/fenl/Makefile
 echo "clean:" >> example/fenl/Makefile
 echo -e "\t\$(MAKE) -f ${KOKKOS_PATH}/example/fenl/Makefile ${KOKKOS_SETTINGS} clean" >> example/fenl/Makefile
 
+echo "KOKKOS_SETTINGS=${KOKKOS_SETTINGS}" > example/make_buildlink/Makefile
+echo "" >> example/make_buildlink/Makefile
+echo "build:" >> example/make_buildlink/Makefile
+echo -e "\t\$(MAKE) -f ${KOKKOS_PATH}/example/make_buildlink/Makefile ${KOKKOS_SETTINGS} build" >> example/make_buildlink/Makefile
+echo "" >> example/make_buildlink/Makefile
+echo "test: build" >> example/make_buildlink/Makefile
+echo -e "\t\$(MAKE) -f ${KOKKOS_PATH}/example/make_buildlink/Makefile ${KOKKOS_SETTINGS} test" >> example/make_buildlink/Makefile
+echo "" >> example/make_buildlink/Makefile
+echo "clean:" >> example/make_buildlink/Makefile
+echo -e "\t\$(MAKE) -f ${KOKKOS_PATH}/example/make_buildlink/Makefile ${KOKKOS_SETTINGS} clean" >> example/make_buildlink/Makefile
+
 echo "KOKKOS_SETTINGS=${KOKKOS_SETTINGS}" > example/tutorial/Makefile
 echo "" >> example/tutorial/Makefile
 echo "build:" >> example/tutorial/Makefile
@@ -447,6 +488,7 @@ if [ ${KOKKOS_DO_EXAMPLES} -gt 0 ]; then
 echo -e "\t\$(MAKE) -C example/fixture" >> Makefile
 echo -e "\t\$(MAKE) -C example/feint" >> Makefile
 echo -e "\t\$(MAKE) -C example/fenl" >> Makefile
+echo -e "\t\$(MAKE) -C example/make_buildlink build" >> Makefile
 echo -e "\t\$(MAKE) -C example/tutorial build" >> Makefile
 fi
 echo "" >> Makefile
@@ -460,6 +502,7 @@ if [ ${KOKKOS_DO_EXAMPLES} -gt 0 ]; then
 echo -e "\t\$(MAKE) -C example/fixture test" >> Makefile
 echo -e "\t\$(MAKE) -C example/feint test" >> Makefile
 echo -e "\t\$(MAKE) -C example/fenl test" >> Makefile
+echo -e "\t\$(MAKE) -C example/make_buildlink test" >> Makefile
 echo -e "\t\$(MAKE) -C example/tutorial test" >> Makefile
 fi
 echo "" >> Makefile
@@ -479,6 +522,7 @@ if [ ${KOKKOS_DO_EXAMPLES} -gt 0 ]; then
 echo -e "\t\$(MAKE) -C example/fixture clean" >> Makefile
 echo -e "\t\$(MAKE) -C example/feint clean" >> Makefile
 echo -e "\t\$(MAKE) -C example/fenl clean" >> Makefile
+echo -e "\t\$(MAKE) -C example/make_buildlink clean" >> Makefile
 echo -e "\t\$(MAKE) -C example/tutorial clean" >> Makefile
 fi
 echo -e "\tcd core; \\" >> Makefile

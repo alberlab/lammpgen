@@ -16,9 +16,10 @@
    Email: zhen_li@brown.edu
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
 #include "pair_mdpd.h"
 #include "atom.h"
 #include "atom_vec.h"
@@ -31,7 +32,6 @@
 #include "citeme.h"
 #include "memory.h"
 #include "error.h"
-#include <time.h>
 
 using namespace LAMMPS_NS;
 
@@ -88,8 +88,7 @@ void PairMDPD::compute(int eflag, int vflag)
   double rhoi, rhoj;
 
   evdwl = 0.0;
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   double **x = atom->x;
   double **v = atom->v;

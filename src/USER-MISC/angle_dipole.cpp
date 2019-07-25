@@ -15,8 +15,8 @@
    Contributing authors: Mario Orsi & Wei Ding (QMUL), m.orsi@qmul.ac.uk
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdlib>
 #include "angle_dipole.h"
 #include "atom.h"
 #include "neighbor.h"
@@ -32,7 +32,11 @@ using namespace MathConst;
 
 /* ---------------------------------------------------------------------- */
 
-AngleDipole::AngleDipole(LAMMPS *lmp) : Angle(lmp) {}
+AngleDipole::AngleDipole(LAMMPS *lmp) : Angle(lmp)
+{
+  k = NULL;
+  gamma0 = NULL;
+}
 
 /* ---------------------------------------------------------------------- */
 
@@ -55,8 +59,7 @@ void AngleDipole::compute(int eflag, int vflag)
   double r,cosGamma,deltaGamma,kdg,rmu;
 
   eangle = 0.0;
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = 0;
+  ev_init(eflag,vflag);
 
   double **x = atom->x; // position vector
   double **mu = atom->mu; // point-dipole components and moment magnitude
@@ -225,7 +228,7 @@ void AngleDipole::write_data(FILE *fp)
    used by ComputeAngleLocal
 ------------------------------------------------------------------------- */
 
-double AngleDipole::single(int type, int iRef, int iDip, int iDummy)
+double AngleDipole::single(int type, int iRef, int iDip, int /*iDummy*/)
 {
   double **x = atom->x; // position vector
   double **mu = atom->mu; // point-dipole components and moment magnitude

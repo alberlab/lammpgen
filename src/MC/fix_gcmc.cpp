@@ -15,9 +15,9 @@
    Contributing author: Paul Crozier, Aidan Thompson (SNL)
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include "fix_gcmc.h"
 #include "atom.h"
 #include "atom_vec.h"
@@ -46,9 +46,8 @@
 #include "thermo.h"
 #include "output.h"
 #include "neighbor.h"
-#include <iostream>
+#include "utils.h"
 
-using namespace std;
 using namespace LAMMPS_NS;
 using namespace FixConst;
 using namespace MathConst;
@@ -406,6 +405,8 @@ FixGCMC::~FixGCMC()
 
   memory->destroy(local_gas_list);
   memory->destroy(molcoords);
+  memory->destroy(molq);
+  memory->destroy(molimage);
 
   delete [] idrigid;
   delete [] idshake;
@@ -476,8 +477,8 @@ void FixGCMC::init()
     if ((force->kspace) ||
         (force->pair == NULL) ||
         (force->pair->single_enable == 0) ||
-        (force->pair_match("hybrid",0)) ||
-        (force->pair_match("eam",0)) ||
+        (force->pair_match("^hybrid",0)) ||
+        (force->pair_match("^eam",0)) ||
         (force->pair->tail_flag)
         ) {
       full_flag = true;
@@ -686,7 +687,7 @@ void FixGCMC::init()
 
   // warning if group id is "all"
 
-  if (groupbit & 1)
+  if ((comm->me == 0) && (groupbit & 1))
     error->warning(FLERR, "Fix gcmc is being applied "
                    "to the default group all");
 
@@ -1253,6 +1254,10 @@ void FixGCMC::attempt_molecule_deletion()
 
   if (ngas == 0) return;
 
+  // work-around to avoid n=0 problem with fix rigid/nvt/small
+
+  if (ngas == natoms_per_molecule) return;
+
   tagint deletion_molecule = pick_random_gas_molecule();
   if (deletion_molecule == -1) return;
 
@@ -1345,7 +1350,7 @@ void FixGCMC::attempt_molecule_insertion()
   MathExtra::quat_to_mat(quat,rotmat);
 
   double insertion_energy = 0.0;
-  bool procflag[natoms_per_molecule];
+  bool *procflag = new bool[natoms_per_molecule];
 
   for (int i = 0; i < natoms_per_molecule; i++) {
     MathExtra::matvec(rotmat,onemols[imol]->x[i],molcoords[i]);
@@ -1468,6 +1473,7 @@ void FixGCMC::attempt_molecule_insertion()
     update_gas_atoms_list();
     ninsertion_successes += 1.0;
   }
+  delete[] procflag;
 }
 
 /* ----------------------------------------------------------------------
@@ -1584,6 +1590,7 @@ void FixGCMC::attempt_atomic_deletion_full()
     }
   }
   if (force->kspace) force->kspace->qsum_qsq();
+  if (force->pair->tail_flag) force->pair->reinit();
   double energy_after = energy_full();
 
   if (random_equal->uniform() <
@@ -1602,6 +1609,7 @@ void FixGCMC::attempt_atomic_deletion_full()
       if (q_flag) atom->q[i] = q_tmp;
     }
     if (force->kspace) force->kspace->qsum_qsq();
+    if (force->pair->tail_flag) force->pair->reinit();
     energy_stored = energy_before;
   }
   update_gas_atoms_list();
@@ -1695,6 +1703,7 @@ void FixGCMC::attempt_atomic_insertion_full()
   comm->borders();
   if (triclinic) domain->lamda2x(atom->nlocal+atom->nghost);
   if (force->kspace) force->kspace->qsum_qsq();
+  if (force->pair->tail_flag) force->pair->reinit();
   double energy_after = energy_full();
 
   if (energy_after < MAXENERGYTEST &&
@@ -1707,6 +1716,7 @@ void FixGCMC::attempt_atomic_insertion_full()
     atom->natoms--;
     if (proc_flag) atom->nlocal--;
     if (force->kspace) force->kspace->qsum_qsq();
+    if (force->pair->tail_flag) force->pair->reinit();
     energy_stored = energy_before;
   }
   update_gas_atoms_list();
@@ -1910,6 +1920,10 @@ void FixGCMC::attempt_molecule_deletion_full()
 
   if (ngas == 0) return;
 
+  // work-around to avoid n=0 problem with fix rigid/nvt/small
+
+  if (ngas == natoms_per_molecule) return;
+
   tagint deletion_molecule = pick_random_gas_molecule();
   if (deletion_molecule == -1) return;
 
@@ -1926,7 +1940,7 @@ void FixGCMC::attempt_molecule_deletion_full()
     grow_molecule_arrays(nmolq);
 
   int m = 0;
-  int tmpmask[atom->nlocal];
+  int *tmpmask = new int[atom->nlocal];
   for (int i = 0; i < atom->nlocal; i++) {
     if (atom->molecule[i] == deletion_molecule) {
       tmpmask[i] = atom->mask[i];
@@ -1940,6 +1954,7 @@ void FixGCMC::attempt_molecule_deletion_full()
     }
   }
   if (force->kspace) force->kspace->qsum_qsq();
+  if (force->pair->tail_flag) force->pair->reinit();
   double energy_after = energy_full();
 
   // energy_before corrected by energy_intra
@@ -1972,8 +1987,10 @@ void FixGCMC::attempt_molecule_deletion_full()
       }
     }
     if (force->kspace) force->kspace->qsum_qsq();
+    if (force->pair->tail_flag) force->pair->reinit();
   }
   update_gas_atoms_list();
+  delete[] tmpmask;
 }
 
 /* ----------------------------------------------------------------------
@@ -2141,6 +2158,7 @@ void FixGCMC::attempt_molecule_insertion_full()
   comm->borders();
   if (triclinic) domain->lamda2x(atom->nlocal+atom->nghost);
   if (force->kspace) force->kspace->qsum_qsq();
+  if (force->pair->tail_flag) force->pair->reinit();
   double energy_after = energy_full();
 
   // energy_after corrected by energy_intra
@@ -2171,6 +2189,7 @@ void FixGCMC::attempt_molecule_insertion_full()
       } else i++;
     }
     if (force->kspace) force->kspace->qsum_qsq();
+    if (force->pair->tail_flag) force->pair->reinit();
   }
   update_gas_atoms_list();
 }
@@ -2418,9 +2437,9 @@ void FixGCMC::update_gas_atoms_list()
       for (int i = 0; i < nlocal; i++) maxmol = MAX(maxmol,molecule[i]);
       tagint maxmol_all;
       MPI_Allreduce(&maxmol,&maxmol_all,1,MPI_LMP_TAGINT,MPI_MAX,world);
-      double comx[maxmol_all];
-      double comy[maxmol_all];
-      double comz[maxmol_all];
+      double *comx = new double[maxmol_all];
+      double *comy = new double[maxmol_all];
+      double *comz = new double[maxmol_all];
       for (int imolecule = 0; imolecule < maxmol_all; imolecule++) {
         for (int i = 0; i < nlocal; i++) {
           if (molecule[i] == imolecule) {
@@ -2450,7 +2469,9 @@ void FixGCMC::update_gas_atoms_list()
           }
         }
       }
-
+      delete[] comx;
+      delete[] comy;
+      delete[] comz;
     } else {
       for (int i = 0; i < nlocal; i++) {
         if (mask[i] & groupbit) {
@@ -2510,10 +2531,19 @@ double FixGCMC::memory_usage()
 void FixGCMC::write_restart(FILE *fp)
 {
   int n = 0;
-  double list[4];
+  double list[12];
   list[n++] = random_equal->state();
   list[n++] = random_unequal->state();
-  list[n++] = next_reneighbor;
+  list[n++] = ubuf(next_reneighbor).d;
+  list[n++] = ntranslation_attempts;
+  list[n++] = ntranslation_successes;
+  list[n++] = nrotation_attempts;
+  list[n++] = nrotation_successes;
+  list[n++] = ndeletion_attempts;
+  list[n++] = ndeletion_successes;
+  list[n++] = ninsertion_attempts;
+  list[n++] = ninsertion_successes;
+  list[n++] = ubuf(update->ntimestep).d;
 
   if (comm->me == 0) {
     int size = n * sizeof(double);
@@ -2537,7 +2567,20 @@ void FixGCMC::restart(char *buf)
   seed = static_cast<int> (list[n++]);
   random_unequal->reset(seed);
 
-  next_reneighbor = static_cast<int> (list[n++]);
+  next_reneighbor = (bigint) ubuf(list[n++]).i;
+
+  ntranslation_attempts  = list[n++];
+  ntranslation_successes = list[n++];
+  nrotation_attempts     = list[n++];
+  nrotation_successes    = list[n++];
+  ndeletion_attempts     = list[n++];
+  ndeletion_successes    = list[n++];
+  ninsertion_attempts    = list[n++];
+  ninsertion_successes   = list[n++];
+
+  bigint ntimestep_restart = (bigint) ubuf(list[n++]).i;
+  if (ntimestep_restart != update->ntimestep)
+    error->all(FLERR,"Must not reset timestep when restarting fix gcmc");
 }
 
 void FixGCMC::grow_molecule_arrays(int nmolatoms) {

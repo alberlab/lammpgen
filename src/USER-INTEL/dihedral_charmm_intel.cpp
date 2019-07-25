@@ -16,7 +16,7 @@
 ------------------------------------------------------------------------- */
 
 #include <mpi.h>
-#include <math.h>
+#include <cmath>
 #include "dihedral_charmm_intel.h"
 #include "atom.h"
 #include "comm.h"
@@ -84,9 +84,9 @@ void DihedralCharmmIntel::compute(int eflag, int vflag,
                                   IntelBuffers<flt_t,acc_t> *buffers,
                                   const ForceConst<flt_t> &fc)
 {
-  if (eflag || vflag) {
-    ev_setup(eflag,vflag);
-  } else evflag = 0;
+  ev_init(eflag,vflag);
+  if (vflag_atom)
+    error->all(FLERR,"USER-INTEL package does not support per-atom stress");
 
   // insure pair->ev_tally() will use 1-4 virial contribution
 

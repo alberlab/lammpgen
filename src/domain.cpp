@@ -16,10 +16,10 @@
 ------------------------------------------------------------------------- */
 
 #include <mpi.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
+#include <cstdlib>
+#include <cstring>
+#include <cstdio>
+#include <cmath>
 #include "domain.h"
 #include "style_region.h"
 #include "atom.h"
@@ -40,13 +40,10 @@
 #include "math_const.h"
 #include "memory.h"
 #include "error.h"
+#include "utils.h"
 
 using namespace LAMMPS_NS;
 using namespace MathConst;
-
-enum{NO_REMAP,X_REMAP,V_REMAP};    // same as fix_deform.cpp
-enum{IGNORE,WARN,ERROR};           // same as thermo.cpp
-enum{LAYOUT_UNIFORM,LAYOUT_NONUNIFORM,LAYOUT_TILED};    // several files
 
 #define BIG   1.0e20
 #define SMALL 1.0e-4
@@ -61,6 +58,7 @@ Domain::Domain(LAMMPS *lmp) : Pointers(lmp)
 {
   box_exist = 0;
   box_change = 0;
+  deform_flag = deform_vremap = deform_groupbit = 0;
 
   dimension = 3;
   nonperiodic = 0;
@@ -155,7 +153,7 @@ void Domain::init()
   for (int i = 0; i < modify->nfix; i++)
     if (strcmp(modify->fix[i]->style,"deform") == 0) {
       deform_flag = 1;
-      if (((FixDeform *) modify->fix[i])->remapflag == V_REMAP) {
+      if (((FixDeform *) modify->fix[i])->remapflag == Domain::V_REMAP) {
         deform_vremap = 1;
         deform_groupbit = modify->fix[i]->groupbit;
       }
@@ -276,7 +274,7 @@ void Domain::set_global_box()
 
 void Domain::set_lamda_box()
 {
-  if (comm->layout != LAYOUT_TILED) {
+  if (comm->layout != Comm::LAYOUT_TILED) {
     int *myloc = comm->myloc;
     double *xsplit = comm->xsplit;
     double *ysplit = comm->ysplit;
@@ -313,7 +311,7 @@ void Domain::set_local_box()
 {
   if (triclinic) return;
 
-  if (comm->layout != LAYOUT_TILED) {
+  if (comm->layout != Comm::LAYOUT_TILED) {
     int *myloc = comm->myloc;
     int *procgrid = comm->procgrid;
     double *xsplit = comm->xsplit;
@@ -518,7 +516,7 @@ void Domain::pbc()
   coord = &x[0][0];  // note: x is always initialized to at least one element.
   int flag = 0;
   for (i = 0; i < n3; i++)
-    if (!ISFINITE(*coord++)) flag = 1;
+    if (!std::isfinite(*coord++)) flag = 1;
   if (flag) error->one(FLERR,"Non-numeric atom coords - simulation unstable");
 
   // setup for PBC checks
@@ -762,14 +760,14 @@ void Domain::image_check()
 
       if (k == -1) {
         nmissing++;
-        if (lostbond == ERROR)
+        if (lostbond == Thermo::ERROR)
           error->one(FLERR,"Bond atom missing in image check");
         continue;
       }
 
-      delx = unwrap[i][0] - unwrap[k][0];
-      dely = unwrap[i][1] - unwrap[k][1];
-      delz = unwrap[i][2] - unwrap[k][2];
+      delx = fabs(unwrap[i][0] - unwrap[k][0]);
+      dely = fabs(unwrap[i][1] - unwrap[k][1]);
+      delz = fabs(unwrap[i][2] - unwrap[k][2]);
 
       if (xperiodic && delx > xprd_half) flag = 1;
       if (yperiodic && dely > yprd_half) flag = 1;
@@ -785,7 +783,7 @@ void Domain::image_check()
   if (flagall && comm->me == 0)
     error->warning(FLERR,"Inconsistent image flags");
 
-  if (lostbond == WARN) {
+  if (lostbond == Thermo::WARN) {
     int all;
     MPI_Allreduce(&nmissing,&all,1,MPI_INT,MPI_SUM,world);
     if (all && comm->me == 0)
@@ -861,7 +859,7 @@ void Domain::box_too_small_check()
 
       if (k == -1) {
         nmissing++;
-        if (lostbond == ERROR)
+        if (lostbond == Thermo::ERROR)
           error->one(FLERR,"Bond atom missing in box size check");
         continue;
       }
@@ -875,7 +873,7 @@ void Domain::box_too_small_check()
     }
   }
 
-  if (lostbond == WARN) {
+  if (lostbond == Thermo::WARN) {
     int all;
     MPI_Allreduce(&nmissing,&all,1,MPI_INT,MPI_SUM,world);
     if (all && comm->me == 0)
@@ -1180,12 +1178,12 @@ int Domain::closest_image(int i, int j)
    if J is not a valid index like -1, just return it
 ------------------------------------------------------------------------- */
 
-int Domain::closest_image(double *pos, int j)
+int Domain::closest_image(const double * const pos, int j)
 {
   if (j < 0) return j;
 
-  int *sametag = atom->sametag;
-  double **x = atom->x;
+  const int * const sametag = atom->sametag;
+  const double * const * const x = atom->x;
 
   int closest = j;
   double delx = pos[0] - x[j][0];
@@ -1212,13 +1210,10 @@ int Domain::closest_image(double *pos, int j)
 /* ----------------------------------------------------------------------
    find and return Xj image = periodic image of Xj that is closest to Xi
    for triclinic, add/subtract tilt factors in other dims as needed
-   not currently used (Jan 2017):
-     used to be called by pair TIP4P styles but no longer,
-       due to use of other closest_image() method
+   called by ServerMD class and LammpsInterface in lib/atc.
 ------------------------------------------------------------------------- */
 
-void Domain::closest_image(const double * const xi, const double * const xj,
-                           double * const xjimage)
+void Domain::closest_image(const double * const xi, const double * const xj, double * const xjimage)
 {
   double dx = xj[0] - xi[0];
   double dy = xj[1] - xi[1];
@@ -1622,7 +1617,7 @@ void Domain::image_flip(int m, int n, int p)
    called from create_atoms() in library.cpp
 ------------------------------------------------------------------------- */
 
-int Domain::ownatom(int id, double *x, imageint *image, int shrinkexceed)
+int Domain::ownatom(int /*id*/, double *x, imageint *image, int shrinkexceed)
 {
   double lamda[3];
   double *coord,*blo,*bhi,*slo,*shi;
@@ -1630,8 +1625,14 @@ int Domain::ownatom(int id, double *x, imageint *image, int shrinkexceed)
   if (image) remap(x,*image);
   else remap(x);
 
+  // if triclinic, convert to lamda coords (0-1)
+  // for periodic dims, resulting coord must satisfy 0.0 <= coord < 1.0
+
   if (triclinic) {
     x2lamda(x,lamda);
+    if (xperiodic && (lamda[0] < 0.0 || lamda[0] >= 1.0)) lamda[0] = 0.0;
+    if (yperiodic && (lamda[1] < 0.0 || lamda[1] >= 1.0)) lamda[1] = 0.0;
+    if (zperiodic && (lamda[2] < 0.0 || lamda[2] >= 1.0)) lamda[2] = 0.0;
     coord = lamda;
   } else coord = x;
 
@@ -1715,6 +1716,9 @@ void Domain::add_region(int narg, char **arg)
     return;
   }
 
+  if (strcmp(arg[1],"none") == 0)
+    error->all(FLERR,"Unrecognized region style 'none'");
+
   if (find_region(arg[0]) >= 0) error->all(FLERR,"Reuse of region ID");
 
   // extend Region list if necessary
@@ -1753,12 +1757,10 @@ void Domain::add_region(int narg, char **arg)
     }
   }
 
-  if (strcmp(arg[1],"none") == 0) error->all(FLERR,"Unknown region style");
   if (region_map->find(arg[1]) != region_map->end()) {
     RegionCreator region_creator = (*region_map)[arg[1]];
     regions[nregion] = region_creator(lmp, narg, arg);
-  }
-  else error->all(FLERR,"Unknown region style");
+  } else error->all(FLERR,utils::check_packages_for_style("region",arg[1],lmp).c_str());
 
   // initialize any region variables via init()
   // in case region is used between runs, e.g. to print a variable

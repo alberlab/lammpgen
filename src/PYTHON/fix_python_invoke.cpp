@@ -16,15 +16,15 @@
 ------------------------------------------------------------------------- */
 
 #include <Python.h>
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include "fix_python_invoke.h"
 #include "atom.h"
 #include "force.h"
 #include "update.h"
 #include "respa.h"
 #include "error.h"
-#include "python.h"
+#include "lmppython.h"
 #include "python_compat.h"
 
 using namespace LAMMPS_NS;

@@ -15,8 +15,8 @@
    Contributing author: W. Michael Brown (Intel)
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdlib>
 #include "angle_harmonic_intel.h"
 #include "atom.h"
 #include "neighbor.h"
@@ -78,8 +78,9 @@ void AngleHarmonicIntel::compute(int eflag, int vflag,
                                IntelBuffers<flt_t,acc_t> *buffers,
                                const ForceConst<flt_t> &fc)
 {
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = 0;
+  ev_init(eflag,vflag);
+  if (vflag_atom)
+    error->all(FLERR,"USER-INTEL package does not support per-atom stress");
 
   if (evflag) {
     if (vflag && !eflag) {
@@ -314,7 +315,7 @@ void AngleHarmonicIntel::init_style()
 
 template <class flt_t, class acc_t>
 void AngleHarmonicIntel::pack_force_const(ForceConst<flt_t> &fc,
-                                        IntelBuffers<flt_t,acc_t> *buffers)
+                                          IntelBuffers<flt_t,acc_t> * /*buffers*/)
 {
   const int bp1 = atom->nangletypes + 1;
   fc.set_ntypes(bp1,memory);

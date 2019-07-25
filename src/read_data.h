@@ -20,7 +20,7 @@ CommandStyle(read_data,ReadData)
 #ifndef LMP_READ_DATA_H
 #define LMP_READ_DATA_H
 
-#include <stdio.h>
+#include <cstdio>
 #include "pointers.h"
 
 namespace LAMMPS_NS {
@@ -124,10 +124,13 @@ Self-explanatory.  Check the input script syntax and compare to the
 documentation for the command.  You can use -echo screen as a
 command-line option when running LAMMPS to see the offending line.
 
-E: Read data add offset is too big
+E: Read data add atomID offset is too big
 
-It cannot be larger than the size of atom IDs, e.g. the maximum 32-bit
-integer.
+UNDOCUMENTED
+
+E: Read data add molID offset is too big
+
+UNDOCUMENTED
 
 E: Non-zero read_data shift z value for 2d simulation
 
@@ -149,11 +152,15 @@ E: No impropers allowed with this atom style
 
 Self-explanatory.
 
+E: No bonded interactions allowed with this atom style
+
+UNDOCUMENTED
+
 E: Fix ID for read_data does not exist
 
 Self-explanatory.
 
-E: Cannot run 2d simulation with nonperiodic Z dimension
+E: Cannot run 2d simulation with non-periodic Z dimension
 
 Use the boundary command to make the z dimension periodic in order to
 run a 2d simulation.
@@ -526,25 +533,25 @@ E: Too many lines in one body in data file - boost MAXBODY
 MAXBODY is a setting at the top of the src/read_data.cpp file.
 Set it larger and re-compile the code.
 
-E: Unexpected end of PairCoeffs section
+E: Unexpected empty line in PairCoeffs section
 
-Read a blank line.
+Read a blank line where there should be coefficient data.
 
-E: Unexpected end of BondCoeffs section
+E: Unexpected empty line in BondCoeffs section
 
-Read a blank line.
+Read a blank line where there should be coefficient data.
 
-E: Unexpected end of AngleCoeffs section
+E: Unexpected empty line in AngleCoeffs section
 
-Read a blank line.
+Read a blank line where there should be coefficient data.
 
-E: Unexpected end of DihedralCoeffs section
+E: Unexpected empty line in DihedralCoeffs section
 
-Read a blank line.
+Read a blank line where there should be coefficient data.
 
-E: Unexpected end of ImproperCoeffs section
+E: Unexpected empty line in ImproperCoeffs section
 
-Read a blank line.
+Read a blank line where there should be coefficient data.
 
 E: Cannot open gzipped file
 
@@ -556,5 +563,10 @@ E: Cannot open file %s
 The specified file cannot be opened.  Check that the path and name are
 correct. If the file is a compressed file, also check that the gzip
 executable can be found and run.
+
+U: Read data add offset is too big
+
+It cannot be larger than the size of atom IDs, e.g. the maximum 32-bit
+integer.
 
 */

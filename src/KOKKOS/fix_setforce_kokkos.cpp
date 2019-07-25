@@ -11,8 +11,8 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <string.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
 #include "fix_setforce_kokkos.h"
 #include "atom_kokkos.h"
 #include "update.h"
@@ -184,7 +184,7 @@ void FixSetForceKokkos<DeviceType>::operator()(TagFixSetForceNonConstant, const 
 
 namespace LAMMPS_NS {
 template class FixSetForceKokkos<LMPDeviceType>;
-#ifdef KOKKOS_HAVE_CUDA
+#ifdef KOKKOS_ENABLE_CUDA
 template class FixSetForceKokkos<LMPHostType>;
 #endif
 }

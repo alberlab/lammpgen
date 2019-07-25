@@ -26,10 +26,10 @@
    Contributing author: Mike Parks (SNL)
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <float.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cfloat>
+#include <cstdlib>
+#include <cstring>
 #include "pair_smd_hertz.h"
 #include "atom.h"
 #include "domain.h"
@@ -87,10 +87,7 @@ void PairHertz::compute(int eflag, int vflag) {
         double *rmass = atom->rmass;
 
         evdwl = 0.0;
-        if (eflag || vflag)
-                ev_setup(eflag, vflag);
-        else
-                evflag = vflag_fdotr = 0;
+        ev_init(eflag, vflag);
 
         double **f = atom->f;
         double **x = atom->x;
@@ -373,7 +370,7 @@ double PairHertz::memory_usage() {
         return 0.0;
 }
 
-void *PairHertz::extract(const char *str, int &i) {
+void *PairHertz::extract(const char *str, int &/*i*/) {
         //printf("in PairTriSurf::extract\n");
         if (strcmp(str, "smd/hertz/stable_time_increment_ptr") == 0) {
                 return (void *) &stable_time_increment;

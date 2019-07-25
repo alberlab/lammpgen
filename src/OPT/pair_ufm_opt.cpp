@@ -17,8 +17,8 @@
             Maurice de Koning (Unicamp/Brazil) - dekoning@ifi.unicamp.br
  ------------------------------------------------------------------------- */
 
-#include <stdlib.h>
-#include <math.h>
+#include <cstdlib>
+#include <cmath>
 #include "pair_ufm_opt.h"
 #include "atom.h"
 #include "force.h"
@@ -34,8 +34,7 @@ PairUFMOpt::PairUFMOpt(LAMMPS *lmp) : PairUFM(lmp) {}
 
 void PairUFMOpt::compute(int eflag, int vflag)
 {
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   if (evflag) {
     if (eflag) {

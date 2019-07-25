@@ -16,8 +16,8 @@
 ------------------------------------------------------------------------- */
 
 #include <mpi.h>
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdlib>
 #include "improper_harmonic_kokkos.h"
 #include "atom_kokkos.h"
 #include "comm.h"
@@ -71,8 +71,7 @@ void ImproperHarmonicKokkos<DeviceType>::compute(int eflag_in, int vflag_in)
   eflag = eflag_in;
   vflag = vflag_in;
 
-  if (eflag || vflag) ev_setup(eflag,vflag,0);
-  else evflag = 0;
+  ev_init(eflag,vflag,0);
 
   // reallocate per-atom arrays if necessary
 
@@ -333,6 +332,25 @@ void ImproperHarmonicKokkos<DeviceType>::coeff(int narg, char **arg)
 }
 
 /* ----------------------------------------------------------------------
+   proc 0 reads coeffs from restart file, bcasts them
+------------------------------------------------------------------------- */
+
+template<class DeviceType>
+void ImproperHarmonicKokkos<DeviceType>::read_restart(FILE *fp)
+{
+  ImproperHarmonic::read_restart(fp);
+
+  int n = atom->nimpropertypes;
+  for (int i = 1; i <= n; i++) {
+    k_k.h_view[i] = k[i];
+    k_chi.h_view[i] = chi[i];
+  }
+
+  k_k.template modify<LMPHostType>();
+  k_chi.template modify<LMPHostType>();
+}
+
+/* ----------------------------------------------------------------------
    tally energy and virial into global and per-atom accumulators
    virial = r1F1 + r2F2 + r3F3 + r4F4 = (r1-r2) F1 + (r3-r2) F3 + (r4-r2) F4
           = (r1-r2) F1 + (r3-r2) F3 + (r4-r3 + r3-r2) F4
@@ -465,7 +483,7 @@ void ImproperHarmonicKokkos<DeviceType>::ev_tally(EV_FLOAT &ev, const int i1, co
 
 namespace LAMMPS_NS {
 template class ImproperHarmonicKokkos<LMPDeviceType>;
-#ifdef KOKKOS_HAVE_CUDA
+#ifdef KOKKOS_ENABLE_CUDA
 template class ImproperHarmonicKokkos<LMPHostType>;
 #endif
 }

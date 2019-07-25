@@ -11,9 +11,9 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
+#include <cstdlib>
+#include <cstring>
+#include <cctype>
 #include "force.h"
 #include "style_bond.h"
 #include "style_angle.h"
@@ -35,6 +35,7 @@
 #include "group.h"
 #include "memory.h"
 #include "error.h"
+#include "utils.h"
 
 using namespace LAMMPS_NS;
 
@@ -182,8 +183,8 @@ void Force::init()
   if (pair_restart) {
     if (!pair) {
       char msg[128];
-      sprintf(msg,"Must re-specify non-restarted pair style (%s) "
-              "after read_restart", pair_restart);
+      snprintf(msg,128,"Must re-specify non-restarted pair style (%s) "
+               "after read_restart", pair_restart);
       error->all(FLERR,msg);
     }
   }
@@ -257,9 +258,7 @@ Pair *Force::new_pair(const char *style, int trysuffix, int &sflag)
     return pair_creator(lmp);
   }
 
-  char str[128];
-  sprintf(str,"Unknown pair style %s",style);
-  error->all(FLERR,str);
+  error->all(FLERR,utils::check_packages_for_style("pair",style,lmp).c_str());
 
   return NULL;
 }
@@ -287,26 +286,13 @@ Pair *Force::pair_match(const char *word, int exact, int nsub)
   int iwhich,count;
 
   if (exact && strcmp(pair_style,word) == 0) return pair;
-  else if (!exact && strstr(pair_style,word)) return pair;
-
-  else if (strstr(pair_style,"hybrid/overlay")) {
-    PairHybridOverlay *hybrid = (PairHybridOverlay *) pair;
-    count = 0;
-    for (int i = 0; i < hybrid->nstyles; i++)
-      if ((exact && strcmp(hybrid->keywords[i],word) == 0) ||
-          (!exact && strstr(hybrid->keywords[i],word))) {
-        iwhich = i;
-        count++;
-        if (nsub == count) return hybrid->styles[iwhich];
-      }
-    if (count == 1) return hybrid->styles[iwhich];
-
-  } else if (strstr(pair_style,"hybrid")) {
+  else if (!exact && utils::strmatch(pair_style,word)) return pair;
+  else if (utils::strmatch(pair_style,"^hybrid")) {
     PairHybrid *hybrid = (PairHybrid *) pair;
     count = 0;
     for (int i = 0; i < hybrid->nstyles; i++)
       if ((exact && strcmp(hybrid->keywords[i],word) == 0) ||
-          (!exact && strstr(hybrid->keywords[i],word))) {
+          (!exact && utils::strmatch(hybrid->keywords[i],word))) {
         iwhich = i;
         count++;
         if (nsub == count) return hybrid->styles[iwhich];
@@ -327,7 +313,7 @@ char *Force::pair_match_ptr(Pair *ptr)
 {
   if (ptr == pair) return pair_style;
 
-  if (strstr(pair_style,"hybrid")) {
+  if (utils::strmatch(pair_style,"^hybrid")) {
     PairHybrid *hybrid = (PairHybrid *) pair;
     for (int i = 0; i < hybrid->nstyles; i++)
       if (ptr == hybrid->styles[i]) return hybrid->keywords[i];
@@ -385,9 +371,7 @@ Bond *Force::new_bond(const char *style, int trysuffix, int &sflag)
     return bond_creator(lmp);
   }
 
-  char str[128];
-  sprintf(str,"Unknown bond style %s",style);
-  error->all(FLERR,str);
+  error->all(FLERR,utils::check_packages_for_style("bond",style,lmp).c_str());
 
   return NULL;
 }
@@ -466,9 +450,7 @@ Angle *Force::new_angle(const char *style, int trysuffix, int &sflag)
     return angle_creator(lmp);
   }
 
-  char str[128];
-  sprintf(str,"Unknown angle style %s",style);
-  error->all(FLERR,str);
+  error->all(FLERR,utils::check_packages_for_style("angle",style,lmp).c_str());
 
   return NULL;
 }
@@ -548,9 +530,7 @@ Dihedral *Force::new_dihedral(const char *style, int trysuffix, int &sflag)
     return dihedral_creator(lmp);
   }
 
-  char str[128];
-  sprintf(str,"Unknown dihedral style %s",style);
-  error->all(FLERR,str);
+  error->all(FLERR,utils::check_packages_for_style("dihedral",style,lmp).c_str());
 
   return NULL;
 }
@@ -629,9 +609,7 @@ Improper *Force::new_improper(const char *style, int trysuffix, int &sflag)
     return improper_creator(lmp);
   }
 
-  char str[128];
-  sprintf(str,"Unknown improper style %s",style);
-  error->all(FLERR,str);
+  error->all(FLERR,utils::check_packages_for_style("improper",style,lmp).c_str());
 
   return NULL;
 }
@@ -665,14 +643,14 @@ Improper *Force::improper_match(const char *style)
    new kspace style
 ------------------------------------------------------------------------- */
 
-void Force::create_kspace(int narg, char **arg, int trysuffix)
+void Force::create_kspace(const char *style, int trysuffix)
 {
   delete [] kspace_style;
   if (kspace) delete kspace;
 
   int sflag;
-  kspace = new_kspace(narg,arg,trysuffix,sflag);
-  store_style(kspace_style,arg[0],sflag);
+  kspace = new_kspace(style,trysuffix,sflag);
+  store_style(kspace_style,style,sflag);
 
   if (comm->style == 1 && !kspace_match("ewald",0))
     error->all(FLERR,
@@ -683,40 +661,38 @@ void Force::create_kspace(int narg, char **arg, int trysuffix)
    generate a kspace class
 ------------------------------------------------------------------------- */
 
-KSpace *Force::new_kspace(int narg, char **arg, int trysuffix, int &sflag)
+KSpace *Force::new_kspace(const char *style, int trysuffix, int &sflag)
 {
   if (trysuffix && lmp->suffix_enable) {
     if (lmp->suffix) {
       sflag = 1;
       char estyle[256];
-      sprintf(estyle,"%s/%s",arg[0],lmp->suffix);
+      sprintf(estyle,"%s/%s",style,lmp->suffix);
       if (kspace_map->find(estyle) != kspace_map->end()) {
         KSpaceCreator kspace_creator = (*kspace_map)[estyle];
-        return kspace_creator(lmp, narg-1, &arg[1]);
+        return kspace_creator(lmp);
       }
     }
 
     if (lmp->suffix2) {
       sflag = 1;
       char estyle[256];
-      sprintf(estyle,"%s/%s",arg[0],lmp->suffix2);
+      sprintf(estyle,"%s/%s",style,lmp->suffix2);
       if (kspace_map->find(estyle) != kspace_map->end()) {
         KSpaceCreator kspace_creator = (*kspace_map)[estyle];
-        return kspace_creator(lmp, narg-1, &arg[1]);
+        return kspace_creator(lmp);
       }
     }
   }
 
   sflag = 0;
-  if (strcmp(arg[0],"none") == 0) return NULL;
-  if (kspace_map->find(arg[0]) != kspace_map->end()) {
-    KSpaceCreator kspace_creator = (*kspace_map)[arg[0]];
-    return kspace_creator(lmp, narg-1, &arg[1]);
+  if (strcmp(style,"none") == 0) return NULL;
+  if (kspace_map->find(style) != kspace_map->end()) {
+    KSpaceCreator kspace_creator = (*kspace_map)[style];
+    return kspace_creator(lmp);
   }
 
-  char str[128];
-  sprintf(str,"Unknown kspace style %s",arg[0]);
-  error->all(FLERR,str);
+  error->all(FLERR,utils::check_packages_for_style("kspace",style,lmp).c_str());
 
   return NULL;
 }
@@ -726,9 +702,9 @@ KSpace *Force::new_kspace(int narg, char **arg, int trysuffix, int &sflag)
 ------------------------------------------------------------------------- */
 
 template <typename T>
-KSpace *Force::kspace_creator(LAMMPS *lmp, int narg, char ** arg)
+KSpace *Force::kspace_creator(LAMMPS *lmp)
 {
-  return new T(lmp, narg, arg);
+  return new T(lmp);
 }
 
 /* ----------------------------------------------------------------------
@@ -741,7 +717,7 @@ KSpace *Force::kspace_creator(LAMMPS *lmp, int narg, char ** arg)
 KSpace *Force::kspace_match(const char *word, int exact)
 {
   if (exact && strcmp(kspace_style,word) == 0) return kspace;
-  else if (!exact && strstr(kspace_style,word)) return kspace;
+  else if (!exact && utils::strmatch(kspace_style,word)) return kspace;
   return NULL;
 }
 
@@ -934,20 +910,21 @@ void Force::boundsbig(const char *file, int line, char *str,
 
 double Force::numeric(const char *file, int line, char *str)
 {
-  if (!str)
-    error->all(file,line,"Expected floating point parameter "
-               "in input script or data file");
-  int n = strlen(str);
+  int n = 0;
+
+  if (str) n = strlen(str);
   if (n == 0)
-    error->all(file,line,"Expected floating point parameter "
-               "in input script or data file");
+    error->all(file,line,"Expected floating point parameter instead of"
+               " NULL or empty string in input script or data file");
 
   for (int i = 0; i < n; i++) {
     if (isdigit(str[i])) continue;
     if (str[i] == '-' || str[i] == '+' || str[i] == '.') continue;
     if (str[i] == 'e' || str[i] == 'E') continue;
-    error->all(file,line,"Expected floating point parameter "
-               "in input script or data file");
+    char msg[256];
+    snprintf(msg,256,"Expected floating point parameter instead of "
+                    "'%s' in input script or data file",str);
+    error->all(file,line,msg);
   }
 
   return atof(str);
@@ -961,18 +938,19 @@ double Force::numeric(const char *file, int line, char *str)
 
 int Force::inumeric(const char *file, int line, char *str)
 {
-  if (!str)
-    error->all(file,line,
-               "Expected integer parameter in input script or data file");
-  int n = strlen(str);
+  int n = 0;
+
+  if (str) n = strlen(str);
   if (n == 0)
-    error->all(file,line,
-               "Expected integer parameter in input script or data file");
+    error->all(file,line,"Expected integer parameter instead of "
+               "NULL or empty string in input script or data file");
 
   for (int i = 0; i < n; i++) {
     if (isdigit(str[i]) || str[i] == '-' || str[i] == '+') continue;
-    error->all(file,line,
-               "Expected integer parameter in input script or data file");
+    char msg[256];
+    snprintf(msg,256,"Expected integer parameter instead of "
+                    "'%s' in input script or data file",str);
+    error->all(file,line,msg);
   }
 
   return atoi(str);
@@ -986,18 +964,19 @@ int Force::inumeric(const char *file, int line, char *str)
 
 bigint Force::bnumeric(const char *file, int line, char *str)
 {
-  if (!str)
-    error->all(file,line,
-               "Expected integer parameter in input script or data file");
-  int n = strlen(str);
+  int n = 0;
+
+  if (str) n = strlen(str);
   if (n == 0)
-    error->all(file,line,
-               "Expected integer parameter in input script or data file");
+    error->all(file,line,"Expected integer parameter instead of "
+               "NULL or empty string in input script or data file");
 
   for (int i = 0; i < n; i++) {
     if (isdigit(str[i]) || str[i] == '-' || str[i] == '+') continue;
-    error->all(file,line,
-               "Expected integer parameter in input script or data file");
+    char msg[256];
+    snprintf(msg,256,"Expected integer parameter instead of "
+                    "'%s' in input script or data file",str);
+    error->all(file,line,msg);
   }
 
   return ATOBIGINT(str);
@@ -1011,18 +990,19 @@ bigint Force::bnumeric(const char *file, int line, char *str)
 
 tagint Force::tnumeric(const char *file, int line, char *str)
 {
-  if (!str)
-    error->all(file,line,
-               "Expected integer parameter in input script or data file");
-  int n = strlen(str);
+  int n = 0;
+
+  if (str) n = strlen(str);
   if (n == 0)
-    error->all(file,line,
-               "Expected integer parameter in input script or data file");
+    error->all(file,line,"Expected integer parameter instead of "
+               "NULL or empty string in input script or data file");
 
   for (int i = 0; i < n; i++) {
     if (isdigit(str[i]) || str[i] == '-' || str[i] == '+') continue;
-    error->all(file,line,
-               "Expected integer parameter in input script or data file");
+    char msg[256];
+    snprintf(msg,256,"Expected integer parameter instead of "
+                    "'%s' in input script or data file",str);
+    error->all(file,line,msg);
   }
 
   return ATOTAGINT(str);

@@ -14,7 +14,7 @@
             Maurice de Koning (Unicamp/Brazil) - dekoning@ifi.unicamp.br
  ------------------------------------------------------------------------- */
 
-#include <math.h>
+#include <cmath>
 #include "pair_ufm_omp.h"
 #include "atom.h"
 #include "comm.h"
@@ -38,9 +38,7 @@ PairUFMOMP::PairUFMOMP(LAMMPS *lmp) :
 
 void PairUFMOMP::compute(int eflag, int vflag)
 {
-  if (eflag || vflag) {
-    ev_setup(eflag,vflag);
-  } else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   const int nall = atom->nlocal + atom->nghost;
   const int nthreads = comm->nthreads;

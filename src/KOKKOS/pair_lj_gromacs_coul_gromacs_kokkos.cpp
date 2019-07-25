@@ -15,10 +15,10 @@
    Contributing author: Ray Shan (SNL)
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include "pair_lj_gromacs_coul_gromacs_kokkos.h"
 #include "kokkos.h"
 #include "atom_kokkos.h"
@@ -103,8 +103,7 @@ void PairLJGromacsCoulGromacsKokkos<DeviceType>::compute(int eflag_in, int vflag
 
   if (neighflag == FULL) no_virial_fdotr_compute = 1;
 
-  if (eflag || vflag) ev_setup(eflag,vflag,0);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag,0);
 
   // reallocate per-atom arrays if necessary
 
@@ -516,7 +515,7 @@ double PairLJGromacsCoulGromacsKokkos<DeviceType>::init_one(int i, int j)
 
 namespace LAMMPS_NS {
 template class PairLJGromacsCoulGromacsKokkos<LMPDeviceType>;
-#ifdef KOKKOS_HAVE_CUDA
+#ifdef KOKKOS_ENABLE_CUDA
 template class PairLJGromacsCoulGromacsKokkos<LMPHostType>;
 #endif
 }

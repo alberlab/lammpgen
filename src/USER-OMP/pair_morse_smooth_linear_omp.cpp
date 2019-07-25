@@ -13,7 +13,7 @@
    Most code borrowed from pair_morse_omp.cpp
 ------------------------------------------------------------------------- */
 
-#include <math.h>
+#include <cmath>
 #include "pair_morse_smooth_linear_omp.h"
 #include "atom.h"
 #include "comm.h"
@@ -40,9 +40,7 @@ PairMorseSmoothLinearOMP::PairMorseSmoothLinearOMP(LAMMPS *lmp) :
 
 void PairMorseSmoothLinearOMP::compute(int eflag, int vflag)
 {
-  if (eflag || vflag) {
-    ev_setup(eflag,vflag);
-  } else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   const int nall = atom->nlocal + atom->nghost;
   const int nthreads = comm->nthreads;

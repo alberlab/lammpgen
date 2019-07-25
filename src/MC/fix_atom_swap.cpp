@@ -16,10 +16,10 @@
                          Alexander Stukowski
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <float.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cfloat>
+#include <cstdlib>
+#include <cstring>
 #include "fix_atom_swap.h"
 #include "atom.h"
 #include "atom_vec.h"
@@ -377,7 +377,7 @@ int FixAtomSwap::attempt_semi_grand()
   int success = 0;
   if (i >= 0)
     if (random_unequal->uniform() <
-      exp(-beta*(energy_after - energy_before
+      exp(beta*(energy_before - energy_after
             + mu[jtype] - mu[itype]))) success = 1;
 
   int success_all = 0;
@@ -695,7 +695,7 @@ void FixAtomSwap::update_swap_atoms_list()
 
 /* ---------------------------------------------------------------------- */
 
-int FixAtomSwap::pack_forward_comm(int n, int *list, double *buf, int pbc_flag, int *pbc)
+int FixAtomSwap::pack_forward_comm(int n, int *list, double *buf, int /*pbc_flag*/, int * /*pbc*/)
 {
   int i,j,m;
 
@@ -771,10 +771,13 @@ double FixAtomSwap::memory_usage()
 void FixAtomSwap::write_restart(FILE *fp)
 {
   int n = 0;
-  double list[4];
+  double list[6];
   list[n++] = random_equal->state();
   list[n++] = random_unequal->state();
-  list[n++] = next_reneighbor;
+  list[n++] = ubuf(next_reneighbor).d;
+  list[n++] = nswap_attempts;
+  list[n++] = nswap_successes;
+  list[n++] = ubuf(update->ntimestep).d;
 
   if (comm->me == 0) {
     int size = n * sizeof(double);
@@ -798,5 +801,12 @@ void FixAtomSwap::restart(char *buf)
   seed = static_cast<int> (list[n++]);
   random_unequal->reset(seed);
 
-  next_reneighbor = static_cast<int> (list[n++]);
+  next_reneighbor = (bigint) ubuf(list[n++]).i;
+
+  nswap_attempts = static_cast<int>(list[n++]);
+  nswap_successes = static_cast<int>(list[n++]);
+
+  bigint ntimestep_restart = (bigint) ubuf(list[n++]).i;
+  if (ntimestep_restart != update->ntimestep)
+    error->all(FLERR,"Must not reset timestep when restarting fix atom/swap");
 }

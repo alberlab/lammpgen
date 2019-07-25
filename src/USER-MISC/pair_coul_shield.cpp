@@ -18,10 +18,10 @@
    [Maaravi et al, J. Phys. Chem. C 121, 22826-22835 (2017)]
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include "pair_coul_shield.h"
 #include "atom.h"
 #include "comm.h"
@@ -64,8 +64,7 @@ void PairCoulShield::compute(int eflag, int vflag)
   int *ilist,*jlist,*numneigh,**firstneigh;
 
   ecoul = 0.0;
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   double **x = atom->x;
   double **f = atom->f;
@@ -231,6 +230,8 @@ void PairCoulShield::init_style()
 {
   if (!atom->q_flag)
     error->all(FLERR,"Pair style coul/shield requires atom attribute q");
+  if (!atom->molecule_flag)
+    error->all(FLERR,"Pair style coul/shield requires atom attribute molecule");
 
   neighbor->request(this,instance_me);
 }
@@ -339,7 +340,7 @@ void PairCoulShield::read_restart_settings(FILE *fp)
 /* ---------------------------------------------------------------------- */
 
 double PairCoulShield::single(int i, int j, int itype, int jtype,
-                           double rsq, double factor_coul, double factor_lj,
+                           double rsq, double factor_coul, double /*factor_lj*/,
                            double &fforce)
 {
   double r, rarg,Vc,fvc,forcecoul,phishieldec;

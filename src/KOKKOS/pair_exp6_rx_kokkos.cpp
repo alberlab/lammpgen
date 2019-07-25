@@ -15,10 +15,10 @@
    Contributing author: Stan Moore (Sandia)
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include "pair_exp6_rx_kokkos.h"
 #include "atom.h"
 #include "comm.h"
@@ -30,11 +30,15 @@
 #include "error.h"
 #include "modify.h"
 #include "fix.h"
-#include <float.h>
+#include <cfloat>
 #include "atom_masks.h"
 #include "neigh_request.h"
 #include "atom_kokkos.h"
 #include "kokkos.h"
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 using namespace LAMMPS_NS;
 using namespace MathConst;
@@ -147,8 +151,7 @@ void PairExp6rxKokkos<DeviceType>::compute(int eflag_in, int vflag_in)
   vflag = vflag_in;
 
   if (neighflag == FULL) no_virial_fdotr_compute = 1;
-  if (eflag || vflag) ev_setup(eflag,vflag,0);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag,0);
 
   // reallocate per-atom arrays if necessary
 
@@ -232,7 +235,7 @@ void PairExp6rxKokkos<DeviceType>::compute(int eflag_in, int vflag_in)
      } else
        Kokkos::parallel_for(Kokkos::RangePolicy<DeviceType, TagPairExp6rxZeroMixingWeights>(0,np_total),*this);
 
-#ifdef KOKKOS_HAVE_CUDA
+#ifdef KOKKOS_ENABLE_CUDA
      Kokkos::parallel_for(Kokkos::RangePolicy<DeviceType, TagPairExp6rxgetMixingWeights>(0,np_total),*this);
 #else
      int errorFlag = 0;
@@ -277,7 +280,7 @@ void PairExp6rxKokkos<DeviceType>::compute(int eflag_in, int vflag_in)
 
   EV_FLOAT ev;
 
-#ifdef KOKKOS_HAVE_CUDA  // Use atomics
+#ifdef KOKKOS_ENABLE_CUDA  // Use atomics
 
   if (neighflag == HALF) {
     if (newton_pair) {
@@ -814,8 +817,11 @@ void PairExp6rxKokkos<DeviceType>::operator()(TagPairExp6rxComputeNoAtomics<NEIG
   }
 
   int tid = 0;
-#ifndef KOKKOS_HAVE_CUDA
-  tid = DeviceType::hardware_thread_id();
+#ifndef KOKKOS_ENABLE_CUDA
+  typedef Kokkos::Experimental::UniqueToken<
+    DeviceType, Kokkos::Experimental::UniqueTokenScope::Global> unique_token_type;
+  unique_token_type unique_token;
+  tid = unique_token.acquire();
 #endif
 
   int i,jj,jnum,itype,jtype;
@@ -1152,6 +1158,10 @@ void PairExp6rxKokkos<DeviceType>::operator()(TagPairExp6rxComputeNoAtomics<NEIG
   t_f(tid,i,2) += fz_i;
   t_uCG(tid,i) += uCG_i;
   t_uCGnew(tid,i) += uCGnew_i;
+
+#ifndef KOKKOS_ENABLE_CUDA
+  unique_token.release(tid);
+#endif
 }
 
 // Experimental thread-safe approach using duplicated data instead of atomics and
@@ -1182,8 +1192,11 @@ void PairExp6rxKokkos<DeviceType>::vectorized_operator(const int &ii, EV_FLOAT& 
   Kokkos::View<E_FLOAT*, typename DAT::t_efloat_1d::array_layout,DeviceType,Kokkos::MemoryTraits<AtomicF<NEIGHFLAG>::value> > a_uCGnew = uCGnew;
 
   int tid = 0;
-#ifndef KOKKOS_HAVE_CUDA
-  tid = DeviceType::hardware_thread_id();
+#ifndef KOKKOS_ENABLE_CUDA
+  typedef Kokkos::Experimental::UniqueToken<
+    DeviceType, Kokkos::Experimental::UniqueTokenScope::Global> unique_token_type;
+  unique_token_type unique_token;
+  tid = unique_token.acquire();
 #endif
 
   const int nRep = 12;
@@ -1612,6 +1625,10 @@ void PairExp6rxKokkos<DeviceType>::vectorized_operator(const int &ii, EV_FLOAT& 
     t_uCG(tid,i) += uCG_i;
     t_uCGnew(tid,i) += uCGnew_i;
   }
+
+#ifndef KOKKOS_ENABLE_CUDA
+  unique_token.release(tid);
+#endif
 }
 
 template<class DeviceType>
@@ -1711,7 +1728,7 @@ void PairExp6rxKokkos<DeviceType>::read_file(char *file)
     fp = force->open_potential(file);
     if (fp == NULL) {
       char str[128];
-      sprintf(str,"Cannot open exp6/rx potential file %s",file);
+      snprintf(str,128,"Cannot open exp6/rx potential file %s",file);
       error->one(FLERR,str);
     }
   }
@@ -2114,7 +2131,7 @@ void partition_range( const int begin, const int end, int &thread_begin, int &th
 
 /* ---------------------------------------------------------------------- */
 
-#ifndef KOKKOS_HAVE_CUDA
+#ifndef KOKKOS_ENABLE_CUDA
 template<class DeviceType>
   template<class ArrayT>
 void PairExp6rxKokkos<DeviceType>::getMixingWeightsVect(const int np_total, int errorFlag,
@@ -2640,7 +2657,7 @@ int PairExp6rxKokkos<DeviceType>::sbmask(const int& j) const {
 
 namespace LAMMPS_NS {
 template class PairExp6rxKokkos<LMPDeviceType>;
-#ifdef KOKKOS_HAVE_CUDA
+#ifdef KOKKOS_ENABLE_CUDA
 template class PairExp6rxKokkos<LMPHostType>;
 #endif
 }

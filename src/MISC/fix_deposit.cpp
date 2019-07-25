@@ -11,9 +11,9 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include "fix_deposit.h"
 #include "atom.h"
 #include "atom_vec.h"
@@ -37,7 +37,6 @@ using namespace FixConst;
 using namespace MathConst;
 
 enum{ATOM,MOLECULE};
-enum{LAYOUT_UNIFORM,LAYOUT_NONUNIFORM,LAYOUT_TILED};    // several files
 enum{DIST_UNIFORM,DIST_GAUSSIAN};
 
 #define EPSILON 1.0e6
@@ -506,7 +505,7 @@ void FixDeposit::pre_exchange()
           newcoord[1] >= sublo[1] && newcoord[1] < subhi[1] &&
           newcoord[2] >= sublo[2] && newcoord[2] < subhi[2]) flag = 1;
       else if (dimension == 3 && newcoord[2] >= domain->boxhi[2]) {
-        if (comm->layout != LAYOUT_TILED) {
+        if (comm->layout != Comm::LAYOUT_TILED) {
           if (comm->myloc[2] == comm->procgrid[2]-1 &&
               newcoord[0] >= sublo[0] && newcoord[0] < subhi[0] &&
               newcoord[1] >= sublo[1] && newcoord[1] < subhi[1]) flag = 1;
@@ -516,7 +515,7 @@ void FixDeposit::pre_exchange()
               newcoord[1] >= sublo[1] && newcoord[1] < subhi[1]) flag = 1;
         }
       } else if (dimension == 2 && newcoord[1] >= domain->boxhi[1]) {
-        if (comm->layout != LAYOUT_TILED) {
+        if (comm->layout != Comm::LAYOUT_TILED) {
           if (comm->myloc[1] == comm->procgrid[1]-1 &&
               newcoord[0] >= sublo[0] && newcoord[0] < subhi[0]) flag = 1;
         } else {
@@ -799,11 +798,12 @@ void FixDeposit::options(int narg, char **arg)
 void FixDeposit::write_restart(FILE *fp)
 {
   int n = 0;
-  double list[4];
+  double list[5];
   list[n++] = random->state();
   list[n++] = ninserted;
   list[n++] = nfirst;
-  list[n++] = next_reneighbor;
+  list[n++] = ubuf(next_reneighbor).d;
+  list[n++] = ubuf(update->ntimestep).d;
 
   if (comm->me == 0) {
     int size = n * sizeof(double);
@@ -824,7 +824,11 @@ void FixDeposit::restart(char *buf)
   seed = static_cast<int> (list[n++]);
   ninserted = static_cast<int> (list[n++]);
   nfirst = static_cast<int> (list[n++]);
-  next_reneighbor = static_cast<int> (list[n++]);
+  next_reneighbor = (bigint) ubuf(list[n++]).i;
+
+  bigint ntimestep_restart = (bigint) ubuf(list[n++]).i;
+  if (ntimestep_restart != update->ntimestep)
+    error->all(FLERR,"Must not reset timestep when restarting this fix");
 
   random->reset(seed);
 }

@@ -16,9 +16,10 @@
    Email: zhen_li@brown.edu
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
 #include "pair_tdpd.h"
 #include "atom.h"
 #include "atom_vec.h"
@@ -31,7 +32,6 @@
 #include "citeme.h"
 #include "memory.h"
 #include "error.h"
-#include <time.h>
 
 using namespace LAMMPS_NS;
 
@@ -91,8 +91,7 @@ PairTDPD::~PairTDPD()
 void PairTDPD::compute(int eflag, int vflag)
 {
   double evdwl = 0.0;
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   double **x = atom->x;
   double **v = atom->v;
@@ -161,7 +160,7 @@ void PairTDPD::compute(int eflag, int vflag)
         f[i][2] += delz*fpair;
 
         // chemical concentration transport
-        if( r < cutcc[itype][jtype]) {
+        if (r < cutcc[itype][jtype]) {
           for(int k=0; k<cc_species; k++) {
             double wcr = 1.0 - r/cutcc[itype][jtype];
             wcr = MAX(0,wcr);
@@ -280,7 +279,9 @@ void PairTDPD::coeff(int narg, char **arg)
   double power_one = force->numeric(FLERR,arg[4]);
   double cut_one   = force->numeric(FLERR,arg[5]);
   double cutcc_one = force->numeric(FLERR,arg[6]);
-  double kappa_one[cc_species],epsilon_one[cc_species],powercc_one[cc_species];
+  double *kappa_one = new double[cc_species];
+  double *epsilon_one = new double[cc_species];
+  double *powercc_one = new double[cc_species];
   for(int k=0; k<cc_species; k++) {
     kappa_one[k]   = force->numeric(FLERR,arg[7+3*k]);
     epsilon_one[k] = force->numeric(FLERR,arg[8+3*k]);
@@ -304,6 +305,9 @@ void PairTDPD::coeff(int narg, char **arg)
     setflag[i][j] = 1;
     count++;
   }
+  delete[] kappa_one;
+  delete[] epsilon_one;
+  delete[] powercc_one;
 
   if (count == 0) error->all(FLERR,"Incorrect args for pair coefficients");
 }
@@ -460,8 +464,8 @@ void PairTDPD::read_restart_settings(FILE *fp)
 
 /* ---------------------------------------------------------------------- */
 
-double PairTDPD::single(int i, int j, int itype, int jtype, double rsq,
-                       double factor_coul, double factor_dpd, double &fforce)
+double PairTDPD::single(int /*i*/, int /*j*/, int itype, int jtype, double rsq,
+                       double /*factor_coul*/, double factor_dpd, double &fforce)
 {
   double r,rinv,wc,phi;
 

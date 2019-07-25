@@ -17,7 +17,7 @@
 
 
 /// \brief Stores numeric id, mass and all mutable data for an atom,
-/// mostly used by a \link cvc \endlink
+/// mostly used by a \link colvar::cvc \endlink
 ///
 /// This class may be used to keep atomic data such as id, mass,
 /// position and collective variable derivatives) altogether.
@@ -63,7 +63,7 @@ public:
   /// from the \link colvarvalue \endlink class), which is also the
   /// most frequent case. For more complex types of \link
   /// colvarvalue \endlink objects, atomic gradients should be
-  /// defined within the specific \link cvc \endlink
+  /// defined within the specific \link colvar::cvc \endlink
   /// implementation
   cvm::rvector   grad;
 
@@ -90,7 +90,7 @@ public:
   /// Destructor
   ~atom();
 
-  /// Set mutable data (everything except id and mass) to zero; update mass
+  /// Set mutable data (everything except id and mass) to zero
   inline void reset_data()
   {
     pos = cvm::atom_pos(0.0);
@@ -100,13 +100,19 @@ public:
   /// Get the latest value of the mass
   inline void update_mass()
   {
-    mass = (cvm::proxy)->get_atom_mass(index);
+    colvarproxy *p = cvm::proxy;
+    if (p->updated_masses()) {
+      mass = p->get_atom_mass(index);
+    }
   }
 
   /// Get the latest value of the charge
   inline void update_charge()
   {
-    charge = (cvm::proxy)->get_atom_charge(index);
+    colvarproxy *p = cvm::proxy;
+    if (p->updated_charges()) {
+      charge = p->get_atom_charge(index);
+    }
   }
 
   /// Get the current position
@@ -145,7 +151,7 @@ public:
 
 
 /// \brief Group of \link atom \endlink objects, mostly used by a
-/// \link cvc \endlink object to gather all atomic data
+/// \link colvar::cvc \endlink object to gather all atomic data
 class colvarmodule::atom_group
   : public colvarparse, public colvardeps
 {
@@ -174,6 +180,9 @@ public:
   /// \brief Set default values for common flags
   int init();
 
+  /// \brief Initialize dependency tree
+  virtual int init_dependencies();
+
   /// \brief Update data required to calculate cvc's
   int setup();
 
@@ -198,16 +207,16 @@ public:
   /// \brief Remove an atom object from this group
   int remove_atom(cvm::atom_iter ai);
 
-  /// \brief Re-initialize the total mass of a group.
+  /// \brief Print the updated the total mass and charge of a group.
   /// This is needed in case the hosting MD code has an option to
   /// change atom masses after their initialization.
-  void reset_mass(std::string &name, int i, int j);
+  void print_properties(std::string const &colvar_name, int i, int j);
 
   /// \brief Implementation of the feature list for atom group
   static std::vector<feature *> ag_features;
 
   /// \brief Implementation of the feature list accessor for atom group
-  virtual const std::vector<feature *> &features()
+  virtual const std::vector<feature *> &features() const
   {
     return ag_features;
   }
@@ -227,8 +236,15 @@ protected:
   /// \brief Array of atom objects
   std::vector<cvm::atom> atoms;
 
-  /// \brief Array of atom identifiers for the MD program (0-based)
+  /// \brief Internal atom IDs for host code
   std::vector<int> atoms_ids;
+
+  /// Sorted list of internal atom IDs (populated on-demand by
+  /// create_sorted_ids); used to read coordinate files
+  std::vector<int> sorted_atoms_ids;
+
+  /// Map entries of sorted_atoms_ids onto the original positions in the group
+  std::vector<int> sorted_atoms_ids_map;
 
   /// \brief Dummy atom position
   cvm::atom_pos dummy_atom_pos;
@@ -273,19 +289,34 @@ public:
     return atoms.size();
   }
 
-  std::string const print_atom_ids() const;
-
   /// \brief If this option is on, this group merely acts as a wrapper
   /// for a fixed position; any calls to atoms within or to
   /// functions that return disaggregated data will fail
   bool b_dummy;
 
-  /// Sorted list of zero-based (internal) atom ids
-  /// (populated on-demand by create_sorted_ids)
-  std::vector<int> sorted_ids;
+  /// Internal atom IDs (populated during initialization)
+  inline std::vector<int> const &ids() const
+  {
+    return atoms_ids;
+  }
 
-  /// Allocates and populates the sorted list of atom ids
-  int create_sorted_ids(void);
+  std::string const print_atom_ids() const;
+
+  /// Allocates and populates sorted_ids and sorted_ids_map
+  int create_sorted_ids();
+
+  /// Sorted internal atom IDs (populated on-demand by create_sorted_ids);
+  /// used to read coordinate files
+  inline std::vector<int> const &sorted_ids() const
+  {
+    return sorted_atoms_ids;
+  }
+
+  /// Map entries of sorted_atoms_ids onto the original positions in the group
+  inline std::vector<int> const &sorted_ids_map() const
+  {
+    return sorted_atoms_ids_map;
+  }
 
   /// Detect whether two groups share atoms
   /// If yes, returns 1-based number of a common atom; else, returns 0
@@ -325,15 +356,19 @@ public:
 
   /// Total mass of the atom group
   cvm::real total_mass;
+
+  /// Update the total mass of the atom group
   void update_total_mass();
 
   /// Total charge of the atom group
   cvm::real total_charge;
+
+  /// Update the total mass of the group
   void update_total_charge();
 
   /// \brief Don't apply any force on this group (use its coordinates
   /// only to calculate a colvar)
-  bool        noforce;
+  bool noforce;
 
   /// \brief Get the current positions
   void read_positions();
@@ -401,18 +436,30 @@ public:
   /// \brief Calculate the center of mass of the atomic positions, assuming that
   /// they are already pbc-wrapped
   int calc_center_of_mass();
+
 private:
+
   /// \brief Center of mass
   cvm::atom_pos com;
+
   /// \brief The derivative of a scalar variable with respect to the COM
   // TODO for scalable calculations of more complex variables (e.g. rotation),
   // use a colvarvalue of vectors to hold the entire derivative
   cvm::rvector scalar_com_gradient;
+
 public:
-  /// \brief Return the center of mass of the atomic positions
+
+  /// \brief Return the center of mass (COM) of the atomic positions
   inline cvm::atom_pos center_of_mass() const
   {
     return com;
+  }
+
+  /// \brief Return previously gradient of scalar variable with respect to the
+  /// COM
+  inline cvm::rvector center_of_mass_scalar_gradient() const
+  {
+    return scalar_com_gradient;
   }
 
   /// \brief Return a copy of the current atom positions, shifted by a constant vector
@@ -422,10 +469,15 @@ public:
   std::vector<cvm::rvector> velocities() const;
 
   ///\brief Calculate the dipole of the atom group around the specified center
-  int calc_dipole(cvm::atom_pos const &com);
+  int calc_dipole(cvm::atom_pos const &dipole_center);
+
 private:
+
+  /// Dipole moment of the atom group
   cvm::rvector dip;
+
 public:
+
   ///\brief Return the (previously calculated) dipole of the atom group
   inline cvm::rvector dipole() const
   {

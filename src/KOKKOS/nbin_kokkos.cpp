@@ -23,8 +23,6 @@
 
 using namespace LAMMPS_NS;
 
-enum{NSQ,BIN,MULTI};       // also in Neighbor
-
 #define SMALL 1.0e-6
 #define CUT2BIN_RATIO 100
 
@@ -148,7 +146,7 @@ void NBinKokkos<DeviceType>::binatomsItem(const int &i) const
 
 namespace LAMMPS_NS {
 template class NBinKokkos<LMPDeviceType>;
-#ifdef KOKKOS_HAVE_CUDA
+#ifdef KOKKOS_ENABLE_CUDA
 template class NBinKokkos<LMPHostType>;
 #endif
 }

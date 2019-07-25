@@ -12,8 +12,8 @@
 ------------------------------------------------------------------------- */
 
 #include <mpi.h>
-#include <string.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
 #include <dirent.h>
 #include "read_restart.h"
 #include "atom.h"
@@ -62,7 +62,9 @@ enum{VERSION,SMALLINT,TAGINT,BIGINT,
      MULTIPROC,MPIIO,PROCSPERFILE,PERPROC,
      IMAGEINT,BOUNDMIN,TIMESTEP,
      ATOM_ID,ATOM_MAP_STYLE,ATOM_MAP_USER,ATOM_SORTFREQ,ATOM_SORTBIN,
-     COMM_MODE,COMM_CUTOFF,COMM_VEL,NO_PAIR};
+     COMM_MODE,COMM_CUTOFF,COMM_VEL,NO_PAIR,
+     EXTRA_BOND_PER_ATOM,EXTRA_ANGLE_PER_ATOM,EXTRA_DIHEDRAL_PER_ATOM,
+     EXTRA_IMPROPER_PER_ATOM,EXTRA_SPECIAL_PER_ATOM,ATOM_MAXSPECIAL};
 
 #define LB_FACTOR 1.1
 
@@ -78,6 +80,9 @@ void ReadRestart::command(int narg, char **arg)
 
   if (domain->box_exist)
     error->all(FLERR,"Cannot read_restart after simulation box is defined");
+
+  MPI_Barrier(world);
+  double time1 = MPI_Wtime();
 
   MPI_Comm_rank(world,&me);
   MPI_Comm_size(world,&nprocs);
@@ -136,7 +141,7 @@ void ReadRestart::command(int narg, char **arg)
     fp = fopen(hfile,"rb");
     if (fp == NULL) {
       char str[128];
-      sprintf(str,"Cannot open restart file %s",hfile);
+      snprintf(str,128,"Cannot open restart file %s",hfile);
       error->one(FLERR,str);
     }
     if (multiproc) delete [] hfile;
@@ -295,7 +300,7 @@ void ReadRestart::command(int narg, char **arg)
       fp = fopen(procfile,"rb");
       if (fp == NULL) {
         char str[128];
-        sprintf(str,"Cannot open restart file %s",procfile);
+        snprintf(str,128,"Cannot open restart file %s",procfile);
         error->one(FLERR,str);
       }
 
@@ -367,7 +372,7 @@ void ReadRestart::command(int narg, char **arg)
       fp = fopen(procfile,"rb");
       if (fp == NULL) {
         char str[128];
-        sprintf(str,"Cannot open restart file %s",procfile);
+        snprintf(str,128,"Cannot open restart file %s",procfile);
         error->one(FLERR,str);
       }
       delete [] procfile;
@@ -560,6 +565,18 @@ void ReadRestart::command(int narg, char **arg)
     Special special(lmp);
     special.build();
   }
+
+  // total time
+
+  MPI_Barrier(world);
+  double time2 = MPI_Wtime();
+
+  if (comm->me == 0) {
+    if (screen)
+      fprintf(screen,"  read_restart CPU = %g secs\n",time2-time1);
+    if (logfile)
+      fprintf(logfile,"  read_restart CPU = %g secs\n",time2-time1);
+  }
 }
 
 /* ----------------------------------------------------------------------
@@ -625,7 +642,7 @@ void ReadRestart::file_search(char *infile, char *outfile)
     if ((ptr = strstr(&ep->d_name[nbegin],end)) == NULL) continue;
     if (strlen(end) == 0) ptr = ep->d_name + strlen(ep->d_name);
     *ptr = '\0';
-    if (strlen(&ep->d_name[nbegin]) < n) {
+    if ((int)strlen(&ep->d_name[nbegin]) < n) {
       strcpy(middle,&ep->d_name[nbegin]);
       if (ATOBIGINT(middle) > maxnum) maxnum = ATOBIGINT(middle);
     }
@@ -713,7 +730,7 @@ void ReadRestart::header(int incompatible)
       domain->dimension = dimension;
       if (domain->dimension == 2 && domain->zperiodic == 0)
         error->all(FLERR,
-                   "Cannot run 2d simulation with nonperiodic Z dimension");
+                   "Cannot run 2d simulation with non-periodic Z dimension");
 
     // read nprocs from restart file, warn if different
 
@@ -913,6 +930,21 @@ void ReadRestart::header(int incompatible)
       comm->cutghostuser = read_double();
     } else if (flag == COMM_VEL) {
       comm->ghost_velocity = read_int();
+
+    } else if (flag == EXTRA_BOND_PER_ATOM) {
+      atom->extra_bond_per_atom = read_int();
+    } else if (flag == EXTRA_ANGLE_PER_ATOM) {
+      atom->extra_angle_per_atom = read_int();
+    } else if (flag == EXTRA_DIHEDRAL_PER_ATOM) {
+      atom->extra_dihedral_per_atom = read_int();
+    } else if (flag == EXTRA_IMPROPER_PER_ATOM) {
+      atom->extra_improper_per_atom = read_int();
+    } else if (flag == ATOM_MAXSPECIAL) {
+      atom->maxspecial = read_int();
+
+      // for backward compatibility
+    } else if (flag == EXTRA_SPECIAL_PER_ATOM) {
+      force->special_extra = read_int();
 
     } else error->all(FLERR,"Invalid flag in header section of restart file");
 
