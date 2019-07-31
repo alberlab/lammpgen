@@ -48,8 +48,8 @@ void AddBond::command(int narg, char **arg)
 
   // parse args
   int btype = force->inumeric(FLERR, arg[0]); // bond type
-  int batom1 = force->inumeric(FLERR, arg[1]); // i atom index
-  int batom2 = force->inumeric(FLERR, arg[2]); // j atom index
+  tagint batom1 = force->tnumeric(FLERR, arg[1]); // i atom index
+  tagint batom2 = force->tnumeric(FLERR, arg[2]); // j atom index
   
   if (batom1 == batom2)
     error->all(FLERR,"Illegal add_bond command");
@@ -58,6 +58,8 @@ void AddBond::command(int narg, char **arg)
     error->all(FLERR,"Invalid bond type in add_bond command");
   
   // get the local indexes. WORKS ONLY SERIALLY
+  // why only serially?
+  
   const int nlocal = atom->nlocal;
   const int idx1 = atom->map(batom1);
   const int idx2 = atom->map(batom2);
@@ -77,7 +79,7 @@ void AddBond::command(int narg, char **arg)
   tagint **bond_atom = atom->bond_atom;
 
   // find the first "free" occurence
-  int pos;
+  int pos=0;
   while (pos < num_bond[idx1]){
     if (bond_type[idx1][pos] < 0){
       break;
