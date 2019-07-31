@@ -25,9 +25,20 @@ CommandStyle(add_multiple_bonds,AddMultipleBonds)
 namespace LAMMPS_NS {
 
 class AddMultipleBonds : protected Pointers {
- public:
-  AddMultipleBonds(class LAMMPS *);
-  void command(int, char **);
+  public:
+    AddMultipleBonds(class LAMMPS *);
+    void command(int, char **);
+  private:
+    int nlocal;
+    
+    tagint batom1, batom2;
+    
+    int *num_bond;
+    int **bond_type;
+    tagint **bond_atom;
+    
+    int btype;
+    void add_bond();
 };
 
 }
@@ -36,8 +47,8 @@ class AddMultipleBonds : protected Pointers {
 #endif
 
 
-/* add_multiple_bonds bond_type id1:id2 id3:id4 ... */
-
+/* add_multiple_bonds bond_type list id1:id2 id3:id4 ... */
+/* add_multiple_bonds bond_type variable string_variable_same_as_list */
 
 /* ERROR/WARNING messages:
 

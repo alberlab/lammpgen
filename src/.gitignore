@@ -1287,17 +1287,14 @@
 /pair_vashishta*.h
 
 
-/add_bond.cpp
-/add_bond.h
+/add_bond.*
+/add_multiple_bonds.*
 /bond_harmonic*.cpp
 /bond_harmonic*.h
-/fix_ellipsoidal_envelope.cpp
-/fix_ellipsoidal_envelope.h
-/remove_bond.cpp
-/remove_bond.h
-/pair_excluded_volume.cpp
-/pair_excluded_volume.h
-/bond_hic.cpp
-/bond_hic.h
+/bond_hic.*
+/fix_ellipsoidal_envelope.*
+/remove_bond.*
+/pair_excluded_volume.*
 /fix_volumetric_restraint.*
+
 
