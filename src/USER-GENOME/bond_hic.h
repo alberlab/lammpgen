@@ -20,7 +20,7 @@ BondStyle(hic, BondHiC)
 #ifndef LMP_BOND_HIC_H
 #define LMP_BOND_HIC_H
 
-#include <stdio.h>
+#include <cstdio>
 #include "bond.h"
 
 namespace LAMMPS_NS {
