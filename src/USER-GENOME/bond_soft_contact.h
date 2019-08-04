@@ -13,7 +13,7 @@
 
 #ifdef BOND_CLASS
 
-BondStyle(hic, BondSoftContact)
+BondStyle(soft_contact, BondSoftContact)
 
 #else
 
@@ -25,10 +25,10 @@ BondStyle(hic, BondSoftContact)
 
 namespace LAMMPS_NS {
 
-    class BondSoftContact : public Bond {
+ class BondSoftContact : public Bond {
  public:
-     BondSoftContact(class LAMMPS *);
-     virtual ~BondSoftContact();
+  BondSoftContact(class LAMMPS *);
+  virtual ~BondSoftContact();
   virtual void compute(int, int);
   void coeff(int, char **);
   double equilibrium_distance(int);
