@@ -468,6 +468,27 @@ void lammps_extract_box(void *ptr, double *boxlo, double *boxhi,
 void *lammps_extract_atom(void *ptr, char *name)
 {
   LAMMPS *lmp = (LAMMPS *) ptr;
+  
+  if (strstr(name,"i_") == name) {
+    int flag;
+    int index_custom = lmp->atom->find_custom(&name[2],flag);
+    if (index_custom < 0 || flag != 0){
+      return NULL;
+    } else {
+      return lmp->atom->dvector[index_custom];
+    }
+  }
+  
+  if (strstr(name,"d_") == name){
+    int flag;
+    int index_custom = lmp->atom->find_custom(&name[2],flag);
+    if (index_custom < 0 || flag != 0){
+      return NULL;
+    } else {
+      return lmp->atom->dvector[index_custom];
+    }
+  }
+  
   return lmp->atom->extract(name);
 }
 
