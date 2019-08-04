@@ -1291,7 +1291,7 @@
 /add_multiple_bonds.*
 /bond_harmonic*.cpp
 /bond_harmonic*.h
-/bond_hic.*
+/bond_soft_contact.*
 /fix_ellipsoidal_envelope.*
 /remove_bond.*
 /pair_excluded_volume.*
