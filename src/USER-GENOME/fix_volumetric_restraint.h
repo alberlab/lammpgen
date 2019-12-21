@@ -24,11 +24,6 @@ FixStyle(volumetricrestraint,FixVolumetricRestraint)
 
 namespace LAMMPS_NS {
 
-struct grid_info {
-  int nx, ny, nz;
-  float x0, y0, z0;
-  float x1, y1, z1;
-};
 
 class FixVolumetricRestraint : public Fix {
  public:
@@ -42,14 +37,17 @@ class FixVolumetricRestraint : public Fix {
   void post_force_respa(int, int, int);
   void min_post_force(int);
   double compute_scalar();
+  double compute_vector(int);
 
  private:
-  double k;
-  float* grid_data;
-  grid_info grid;
+  double kspring;
+  double origin[3];   // [x_min, y_min, z_min] origin, lowest, leftmost vertex for the volume map
+  double grid_step[3]; // [dx, dy, dz] grid spacing along the three dimensions
+  int    n_voxel[3];    // number of voxels along the three dimensions
+
+  double mappa[200][200][40];   // per il momento e' inizializzata in eccesso...cioe' e' piu' grande di quello che serve
   double etotal;
   double* ftotal;
-  double grid_step[3];
 };
 
 }
