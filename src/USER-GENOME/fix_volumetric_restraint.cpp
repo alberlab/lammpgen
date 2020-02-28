@@ -64,7 +64,9 @@ FixVolumetricRestraint::FixVolumetricRestraint(LAMMPS *lmp, int narg, char **arg
   /*------- read in file whose name is given in "arg[3]", STRUCT object ---- */
   std::ifstream fp(arg[3], std::ios::binary);
 
+  fp >>                                           body_idx;
   fp >>     n_voxel[0] >>     n_voxel[1] >>     n_voxel[2]; 
+  fp >>      center[0] >>      center[1] >>      center[2];
   fp >>      origin[0] >>      origin[1] >>      origin[2];  // origin of the map
   fp >>   grid_step[0] >>   grid_step[1] >>   grid_step[2];  // grid step
 
@@ -165,7 +167,7 @@ void FixVolumetricRestraint::post_force(int vflag)
   int nlocal = atom->nlocal;
 
   // auxiliary vectors
-  double ix_d[3], vx_crd[3];
+  double ix_d[3];
   int    ix[3];
   //double temp[3] = {0,0,0};
   //int count = 0;
@@ -204,59 +206,48 @@ void FixVolumetricRestraint::post_force(int vflag)
       //	{	myfile << i << "\n";
       //	} 
 
-      // if particle is outside of density map range OR inside, but outside of the volume, then apply restraint
-      if ((ix[0] < 0 || ix[1] < 0 || ix[2] < 0) || (mappa[ix[0]][ix[1]][ix[2]] == 1))
+      // IF WE ARE TALKING ABOUT NUCLEAR ENVELOPE
+      if (body_idx == 0)
 	{
+ 
+      	 // if particle is outside of density map range OR inside, but outside of the volume, then apply restraint
+         if ((ix[0] < 0 || ix[1] < 0 || ix[2] < 0) || (mappa[ix[0]][ix[1]][ix[2]] == 1))
+         	{
 
-	norma = sqrt(x[i][0] * x[i][0] + x[i][1] * x[i][1] + x[i][2] * x[i][2]);
+	      norma = sqrt((x[i][0] - center[0]) * (x[i][0] - center[0]) + 
+                           (x[i][1] - center[1]) * (x[i][1] - center[1]) + 
+                           (x[i][2] - center[2]) * (x[i][2] - center[2])
+                          );
 
-        ftotal[i] = norm3(f[i]);
-        etotal    += kspring * norma;
+              ftotal[i] = norm3(f[i]);
+              etotal    += kspring * norma;
 
-        f[i][0] += kspring * (-x[i][0]) / norma;
-        f[i][1] += kspring * (-x[i][1]) / norma;
-        f[i][2] += kspring * (-x[i][2]) / norma;
+              f[i][0] += kspring * (center[0] - x[i][0]) / norma;
+              f[i][1] += kspring * (center[1] - x[i][1]) / norma;
+              f[i][2] += kspring * (center[2] - x[i][2]) / norma;
 
-        /*   DA QUI IN SOTTO C'E' LA VERSIONE DOVE SI RIPORTA LA PARTICELLA ALLE COORDINATE DEL VOXEL 
-	// in order to apply restraint, let us first compute the reference coordinates for voxel
-      	vx_crd[0] = origin[0] + ix[0] * grid_step[0];
-        vx_crd[1] = origin[1] + ix[1] * grid_step[1];
-        vx_crd[2] = origin[2] + ix[2] * grid_step[2];
+	        }
+         }
 
-        //myfile << i << " PRE-FIX " << f[i][0] << " " << f[i][1] << " " << f[i][2] << "\n";
+      // IF WE ARE TALKING ABOUT NUCLEAR BODY
+      if (body_idx == 1)
+	 {
+	  if ((ix[0] >= 0 && ix[1] >=0 && ix[2] >=0) && (mappa[ix[0]][ix[1]][ix[2]] == 1))
+		{
+	      norma = sqrt((x[i][0] - center[0]) * (x[i][0] - center[0]) +
+                           (x[i][1] - center[1]) * (x[i][1] - center[1]) +
+                           (x[i][2] - center[2]) * (x[i][2] - center[2])
+                          );
 
-        norma = sqrt(vx_crd[0] * vx_crd[0] + vx_crd[1] * vx_crd[1] + vx_crd[2] * vx_crd[2]);
-	//myfile << i << " " << temp[0] << " " << temp[1] << " " << temp[2] << " " << norma << "\n";
+              ftotal[i] =  norm3(f[i]);
+              etotal    += kspring * norma;
 
-        // are we divinding by zero at some point, when normalizing distances?
-	if (norma < 0)
-	{
-		myfile << "ACHTUNG, ZERO norm, dividing by 0, particle " << i << "\n"; 
-	}
-	
-
-	//myfile << " k " << k << "\n";
-        //myfile << " crd " << vx_crd[0] << " " << vx_crd[1] << " " << vx_crd[2] << "\n";
-	//myfile << " k * temp[0] /norma " << k*temp[0]/norma << "\n";
-       
-        ftotal[i] = norm3(f[i]);
-        etotal    += kspring * norma;
-	// apply a normalized radial force which is scaled by a coefficient
-        // force is radial and uses the geometric center of the density map
-      	f[i][0] += kspring * (-1.0) * vx_crd[0] / norma;
-      	f[i][1] += kspring * (-1.0) * vx_crd[1] / norma;
-      	f[i][2] += kspring * (-1.0) * vx_crd[2] / norma;
-
-        //myfile << "particle # " << i << " voxel = " << ix[0] << " " << ix[1] << " " << ix[2] << "\n";
-	//myfile << i << " POST-FIX " << f[i][0] << " " << f[i][1] << " " << f[i][2] << "\n";	
-
-        //ftotal[i] = norm3(f[i]);
-
-        // this is the contribution from the fix; so, sums up only the contributions from inside current loop
-        // if code does not enter the loop, particles are in the volume already, no extra force/eneergy contributions
-        //etotal    += kspring * norma;   // radial force
-        */
-	}
+              f[i][0] += kspring * (x[i][0] - center[0]) / norma;
+              f[i][1] += kspring * (x[i][1] - center[1]) / norma;
+              f[i][2] += kspring * (x[i][2] - center[2]) / norma;
+		
+		}
+	 }
     
         //myfile << i << " POST-FIX " << f[i][0] << " " << f[i][1] << " " << f[i][2] << "\n\n";
  

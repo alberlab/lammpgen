@@ -40,11 +40,13 @@ class FixVolumetricRestraint : public Fix {
   double compute_vector(int);
 
  private:
-  double kspring;
-  double origin[3];   // [x_min, y_min, z_min] origin, lowest, leftmost vertex for the volume map
+  double      kspring;
+  double    origin[3];   // [x_min, y_min, z_min] origin, lowest, leftmost vertex for the volume map
   double grid_step[3]; // [dx, dy, dz] grid spacing along the three dimensions
-  int    n_voxel[3];    // number of voxels along the three dimensions
-
+  double    center[3];    // geometric center of the nuclear body, pozzo del campo centrale di forza
+  int      n_voxel[3];    // number of voxels along the three dimensions
+  int        body_idx;     // index to discriminate between nuclear envelope and/ord nuclear bodies
+ 
   double mappa[200][200][40];   // per il momento e' inizializzata in eccesso...cioe' e' piu' grande di quello che serve
   double etotal;
   double* ftotal;
