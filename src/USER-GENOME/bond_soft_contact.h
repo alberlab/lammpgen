@@ -13,22 +13,22 @@
 
 #ifdef BOND_CLASS
 
-BondStyle(hic, BondHiC)
+BondStyle(soft_contact, BondSoftContact)
 
 #else
 
-#ifndef LMP_BOND_HIC_H
-#define LMP_BOND_HIC_H
+#ifndef LMP_BOND_SOFT_CONTACT_H
+#define LMP_BOND_SOFT_CONTACT_H
 
-#include <stdio.h>
+#include <cstdio>
 #include "bond.h"
 
 namespace LAMMPS_NS {
 
-    class BondHiC : public Bond {
+ class BondSoftContact : public Bond {
  public:
-     BondHiC(class LAMMPS *);
-     virtual ~BondHiC();
+  BondSoftContact(class LAMMPS *);
+  virtual ~BondSoftContact();
   virtual void compute(int, int);
   void coeff(int, char **);
   double equilibrium_distance(int);

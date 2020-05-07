@@ -20,7 +20,7 @@ BondStyle(harmonic_upper_bound,BondHarmonicUpperBound)
 #ifndef LMP_BOND_HARMONIC_UPPER_BOUND_H
 #define LMP_BOND_HARMONIC_UPPER_BOUND_H
 
-#include <stdio.h>
+#include <cstdio>
 #include "bond.h"
 
 namespace LAMMPS_NS {

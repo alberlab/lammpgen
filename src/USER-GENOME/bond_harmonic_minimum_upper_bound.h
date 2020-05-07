@@ -20,7 +20,7 @@ BondStyle(pull_harmonic_minimum_upper_bound,BondHarmonicMinimumUpperBound)
 #ifndef LMP_BOND_HARMONIC_MINIMUM_UPPER_BOUND_H
 #define LMP_BOND_HARMONIC_MINIMUM_UPPER_BOUND_H
 
-#include <stdio.h>
+#include <cstdio>
 #include "bond.h"
 
 namespace LAMMPS_NS {

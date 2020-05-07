@@ -11,9 +11,9 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <math.h>
-#include <stdlib.h>
-#include "bond_hic.h"
+#include <cmath>
+#include <cstdlib>
+#include "bond_soft_contact.h"
 #include "atom.h"
 #include "neighbor.h"
 #include "domain.h"
@@ -26,11 +26,11 @@ using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
 
-BondHiC::BondHiC(LAMMPS *lmp) : Bond(lmp) {}
+BondSoftContact::BondSoftContact(LAMMPS *lmp) : Bond(lmp) {}
 
 /* ---------------------------------------------------------------------- */
 
-BondHiC::~BondHiC()
+BondSoftContact::~BondSoftContact()
 {  
   if (allocated && !copymode) {
     memory->destroy(setflag);
@@ -41,7 +41,7 @@ BondHiC::~BondHiC()
 
 /* ---------------------------------------------------------------------- */
 
-void BondHiC::compute(int eflag, int vflag)
+void BondSoftContact::compute(int eflag, int vflag)
 {
   int i1,i2,n,type;
   double delx,dely,delz,ebond,fbond;
@@ -53,7 +53,7 @@ void BondHiC::compute(int eflag, int vflag)
 
   double **x = atom->x;
   double **f = atom->f;
-  int **bondlist = neighbor->bondlist;
+  int **bondlist = neighbor->bondlist; //bond list, only for this bond if bond style is hybrid
   int nbondlist = neighbor->nbondlist;
   int nlocal = atom->nlocal;
   int newton_bond = force->newton_bond;
@@ -112,13 +112,13 @@ void BondHiC::compute(int eflag, int vflag)
 
 /* ---------------------------------------------------------------------- */
 
-void BondHiC::allocate()
+void BondSoftContact::allocate()
 {
   allocated = 1;
   int n = atom->nbondtypes;
 
-  memory->create(k,n+1,"bond:k");
-  memory->create(range,n+1,"bond:range");
+  memory->create(k,n+1,"bond:k"); // kspring
+  memory->create(range,n+1,"bond:range");  //contact range , e.g. 2 times of radius
 
   memory->create(setflag,n+1,"bond:setflag");
   for (int i = 1; i <= n; i++) setflag[i] = 0;
@@ -128,7 +128,7 @@ void BondHiC::allocate()
    set coeffs for one or more types
 ------------------------------------------------------------------------- */
 
-void BondHiC::coeff(int narg, char **arg)
+void BondSoftContact::coeff(int narg, char **arg)
 {
   if (narg != 3) error->all(FLERR,"Incorrect args for bond coefficients");
   if (!allocated) allocate();
@@ -154,7 +154,7 @@ void BondHiC::coeff(int narg, char **arg)
    return an equilbrium bond length
 ------------------------------------------------------------------------- */
 
-double BondHiC::equilibrium_distance(int i)
+double BondSoftContact::equilibrium_distance(int i)
 {
   return range[i];
 }
@@ -163,7 +163,7 @@ double BondHiC::equilibrium_distance(int i)
    proc 0 writes out coeffs to restart file
 ------------------------------------------------------------------------- */
 
-void BondHiC::write_restart(FILE *fp)
+void BondSoftContact::write_restart(FILE *fp)
 {
   fwrite(&k[1],sizeof(double),atom->nbondtypes,fp);
   fwrite(&range[1],sizeof(double),atom->nbondtypes,fp);
@@ -173,7 +173,7 @@ void BondHiC::write_restart(FILE *fp)
    proc 0 reads coeffs from restart file, bcasts them
 ------------------------------------------------------------------------- */
 
-void BondHiC::read_restart(FILE *fp)
+void BondSoftContact::read_restart(FILE *fp)
 {
   allocate();
 
@@ -191,7 +191,7 @@ void BondHiC::read_restart(FILE *fp)
    proc 0 writes to data file
 ------------------------------------------------------------------------- */
 
-void BondHiC::write_data(FILE *fp)
+void BondSoftContact::write_data(FILE *fp)
 {
   for (int i = 1; i <= atom->nbondtypes; i++)
     fprintf(fp,"%d %g %g\n",i,k[i],range[i]);
@@ -206,7 +206,7 @@ void BondHiC::write_data(FILE *fp)
 
 
 
-double BondHiC::single(int type, double rsq, int i, int j,
+double BondSoftContact::single(int type, double rsq, int i, int j,
                         double &fforce)
 {
   double r = sqrt(rsq);

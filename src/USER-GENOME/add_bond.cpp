@@ -11,8 +11,8 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 #include "add_bond.h"
 #include "atom.h"
 #include "domain.h"
@@ -38,35 +38,50 @@ AddBond::AddBond(LAMMPS *lmp) : Pointers(lmp) {}
 void AddBond::command(int narg, char **arg)
 {
   if (domain->box_exist == 0)
-    error->all(FLERR,"Create_bonds command before simulation box is defined");
+    error->all(FLERR,"Add_bonds command before simulation box is defined");
   if (atom->tag_enable == 0)
-    error->all(FLERR,"Cannot use create_bonds unless atoms have IDs");
+    error->all(FLERR,"Cannot use add_bond unless atoms have IDs");
   if (atom->molecular != 1)
-    error->all(FLERR,"Cannot use create_bonds with non-molecular system");
+    error->all(FLERR,"Cannot use add_bond with non-molecular system");
 
-  if (narg != 3) error->all(FLERR,"Illegal create_bonds command");
+  if (narg != 3) error->all(FLERR,"Illegal add_bond command");
 
   // parse args
   int btype = force->inumeric(FLERR, arg[0]); // bond type
-  int itag = force->inumeric(FLERR, arg[1]); // i atom index
-  int jtag = force->inumeric(FLERR, arg[2]); // j atom index
-
+  tagint batom1 = force->tnumeric(FLERR, arg[1]); // i atom index
+  tagint batom2 = force->tnumeric(FLERR, arg[2]); // j atom index
+  
+  if (batom1 == batom2)
+    error->all(FLERR,"Illegal add_bond command");
+  
   if (btype <= 0 || btype > atom->nbondtypes)
     error->all(FLERR,"Invalid bond type in add_bond command");
   
   // get the local indexes. WORKS ONLY SERIALLY
-  int ii = atom->map(itag);
-  int jj = atom->map(jtag); 
-
+  // why only serially?
+  
+  const int nlocal = atom->nlocal;
+  const int idx1 = atom->map(batom1);
+  const int idx2 = atom->map(batom2);
+  
+  int count = 0;
+  if ((idx1 >= 0) && (idx1 < nlocal)) count++;
+  if ((idx2 >= 0) && (idx2 < nlocal)) count++;
+  
+  int allcount;
+  MPI_Allreduce(&count,&allcount,1,MPI_INT,MPI_SUM,world);
+  if (allcount != 2)
+    error->all(FLERR,"Add_bond atoms do not exist");
+  
   // get the globals
   int *num_bond = atom->num_bond;
   int **bond_type = atom->bond_type;
   tagint **bond_atom = atom->bond_atom;
 
   // find the first "free" occurence
-  int pos;
-  while (pos < num_bond[ii]){
-    if (bond_type[ii][pos] < 0){
+  int pos=0;
+  while (pos < num_bond[idx1]){
+    if (bond_type[idx1][pos] < 0){
       break;
     }
     ++pos;
@@ -76,13 +91,13 @@ void AddBond::command(int narg, char **arg)
   if (pos >= atom->bond_per_atom)
   {
     error->one(FLERR,
-               "New bond exceeded bonds per atom in create_bonds");
+               "New bond exceeded bonds per atom in add_bond");
   }
 
   // set the bond
-  bond_type[ii][pos] = btype;
-  bond_atom[ii][pos] = jtag;
-  if(pos == num_bond[ii]) num_bond[ii]++;
+  bond_type[idx1][pos] = btype;
+  bond_atom[idx1][pos] = batom2;
+  if(pos == num_bond[idx1]) num_bond[idx1]++;
 
   if (comm->me == 0) {
     if (screen) {
