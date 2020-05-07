@@ -47,8 +47,9 @@ FixVolumetricRestraint::FixVolumetricRestraint(LAMMPS *lmp, int narg, char **arg
   // preamble
   int tmp1, tmp2, tmp3, tmp4;
   int count = 0;
+  double new_center[3];
 
-  //std::ofstream myfile;
+  std::ofstream myfile;
   //myfile.open ("debug.txt");
  
   scalar_flag = 1;
@@ -56,10 +57,13 @@ FixVolumetricRestraint::FixVolumetricRestraint(LAMMPS *lmp, int narg, char **arg
   //size_vector = 1;
   dynamic_group_allow = 1;
 
-  if (narg != 5) error->all(FLERR,"Illegal volumetric restraint command [args: density_filename k]");
+  if (narg != 6) error->all(FLERR,"Illegal volumetric restraint command [args: density_filename env_factor k]");
   
   // define parameter k which I expect to be spring constant
-  kspring = force->numeric(FLERR,arg[4]);
+  kspring = force->numeric(FLERR,arg[5]);
+
+  // define parameter evf used in optimization to slightly scale up or down NE
+  evf     = force->numeric(FLERR,arg[4]);
 
   /*------- read in file whose name is given in "arg[3]", STRUCT object ---- */
   std::ifstream fp(arg[3], std::ios::binary);
@@ -81,6 +85,53 @@ FixVolumetricRestraint::FixVolumetricRestraint(LAMMPS *lmp, int narg, char **arg
         mappa[tmp1][tmp2][tmp3] = tmp4;    // reproduce the density map
       } 
 
+  //myfile << grid_step[0] << ' ' << grid_step[1] << ' ' << grid_step[2] << '\n';
+  //myfile << origin[0]    << ' ' << origin[1]    << ' ' << origin[2] << '\n';
+
+  //myfile << " scaling I mean = " << evf << '\n';
+ 
+  // if scaling factor different from 1.0...
+  if (evf != 1.0) {
+
+ 
+ 	 // scale grid quantities by factor "evf"
+  	if (body_idx == 0) {
+
+  		center[0]    = center[0] * evf;
+  		center[1]    = center[1] * evf;
+  		center[2]    = center[2] * evf;
+
+  		origin[0]    = origin[0] * evf;
+  		origin[1]    = origin[1] * evf;
+  		origin[2]    = origin[2] * evf;
+
+  		grid_step[0] = grid_step[0] * evf;
+  		grid_step[1] = grid_step[1] * evf;
+  		grid_step[2] = grid_step[2] * evf;
+  	}
+
+  	// if nuclear bodies, it is important that the geometric center is preserved
+  	if (body_idx == 1) {
+
+		new_center[0] = center[0]/evf;
+                new_center[1] = center[1]/evf;
+                new_center[2] = center[2]/evf;
+
+  		origin[0]    = origin[0] / evf;
+  		origin[1]    = origin[1] / evf;
+  		origin[2]    = origin[2] / evf;
+
+  		grid_step[0] = grid_step[0] / evf;
+  		grid_step[1] = grid_step[1] / evf;
+  		grid_step[2] = grid_step[2] / evf;
+
+		// translate scaled grid s.t. center is the (non-scaled) nucleolar center
+  		origin[0] = origin[0] + (center[0] - new_center[0]);
+                origin[1] = origin[1] + (center[1] - new_center[1]);
+                origin[2] = origin[2] + (center[2] - new_center[2]);
+	}
+     }
+
   /*// check something is sto cristo di lettura da file
    for (int i = 0; i < n_voxel[0]; ++i)
      {
@@ -98,7 +149,8 @@ FixVolumetricRestraint::FixVolumetricRestraint(LAMMPS *lmp, int narg, char **arg
          }
      }
   myfile  << "number of 0 entries = " << count << "\n";
-  myfile.close(); */
+  myyfile.close(); */
+ myfile.close();
 
   // this is needed to allocate memory space for the pointers declared in the .h file in the "private" section
   memory->create(this->ftotal, atom->nmax, "FixVolumetricRestraint:ftotal");
