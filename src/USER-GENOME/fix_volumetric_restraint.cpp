@@ -11,9 +11,9 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <cmath>
-#include <cstring>
-#include <cstdlib>
+#include <math.h>
+#include <string.h>
+#include <stdlib.h>
 #include <fstream>
 #include "fix_volumetric_restraint.h"
 #include "atom.h"
