@@ -45,11 +45,12 @@ FixVolumetricRestraint::FixVolumetricRestraint(LAMMPS *lmp, int narg, char **arg
 {
 
   // preamble
-  int tmp1, tmp2, tmp3, tmp4;
-  int count = 0;
-  double new_center[3];
+  int tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7;
+  int                          count = 0;
+  double                   new_center[3];
+  double                         scaling;
 
-  std::ofstream myfile;
+  //std::ofstream myfile;
   //myfile.open ("debug.txt");
  
   scalar_flag = 1;
@@ -57,100 +58,68 @@ FixVolumetricRestraint::FixVolumetricRestraint(LAMMPS *lmp, int narg, char **arg
   //size_vector = 1;
   dynamic_group_allow = 1;
 
-  if (narg != 6) error->all(FLERR,"Illegal volumetric restraint command [args: density_filename env_factor k]");
+  if (narg != 6) error->all(FLERR,"Illegal volumetric restraint command [args: volume_filename env_factor k]");
   
-  // define parameter k which I expect to be spring constant
-  kspring = force->numeric(FLERR,arg[5]);
+  k = force->numeric(FLERR,arg[5]);
 
-  // define parameter evf used in optimization to slightly scale up or down NE
+  // define parameter evf used in optimization to slightly scale up or down envelopes/volumes
   evf     = force->numeric(FLERR,arg[4]);
 
   /*------- read in file whose name is given in "arg[3]", STRUCT object ---- */
   std::ifstream fp(arg[3], std::ios::binary);
 
   fp >>                                           body_idx;
-  fp >>     n_voxel[0] >>     n_voxel[1] >>     n_voxel[2]; 
-  fp >>      center[0] >>      center[1] >>      center[2];
-  fp >>      origin[0] >>      origin[1] >>      origin[2];  // origin of the map
-  fp >>   grid_step[0] >>   grid_step[1] >>   grid_step[2];  // grid step
+  fp >>     n_voxel[0] >>     n_voxel[1] >>     n_voxel[2];  // nx, ny, nz (number of pixels in each direction)
+  fp >>      center[0] >>      center[1] >>      center[2];  // center of mass of the map
+  fp >>      origin[0] >>      origin[1] >>      origin[2];  // origin of the map (bottom, most left pixel edge)
+  fp >>   grid_step[0] >>   grid_step[1] >>   grid_step[2];  // step size of a pixel/voxel
 
-  //myfile << n_voxel[0] << " " << n_voxel[1] << " " << n_voxel[2] << "\n";
-  //myfile <<  origin[0] << " " <<  origin[1] << " " <<  origin[2] << "\n";
+  // define the size of the arrays
+
   //myfile << grid_step[0] << " " << grid_step[1] << " " << grid_step[2] << "\n";
 
   /* read in all the entries of the volume map matrix */
   for (int i = 0; i < n_voxel[0] * n_voxel[1] * n_voxel[2]; i++)
       {
-	fp >> tmp1 >> tmp2 >> tmp3 >> tmp4;    // one full line at the time, each line is (x, y, z, density)
-        mappa[tmp1][tmp2][tmp3] = tmp4;    // reproduce the density map
+	fp >> tmp1 >> tmp2 >> tmp3 >> tmp4 >> tmp5 >> tmp6 >> tmp7;    // one full line at the time, each line is (x, y, z, EDT[x], EDT[y], EDT[z], in/out label)
+ 
+        mappa[tmp1][tmp2][tmp3][0] = tmp4;    // reproduce the Euclidean Distance Transform pattern
+        mappa[tmp1][tmp2][tmp3][1] = tmp5;
+        mappa[tmp1][tmp2][tmp3][2] = tmp6;
+        mappa[tmp1][tmp2][tmp3][3] = tmp7;
+ 
       } 
 
-  //myfile << grid_step[0] << ' ' << grid_step[1] << ' ' << grid_step[2] << '\n';
-  //myfile << origin[0]    << ' ' << origin[1]    << ' ' << origin[2] << '\n';
+  // scaling factors for volumes: for the lamina DamID it would help to have a slightly smaller map, so that there is un intercapetine in cui le particelle sono libere e,
+  // anche se non a contatto fisico con la lamina, assumiamo siano a contatto (questo e' il contact range equivalent)
+  //if (((body_idx == 1) && (k > 0)) || ((body_idx == 0) && (k < 0))) { scaling = 1.0/evf;}
+  //if (((body_idx == 0) && (k > 0)) || ((body_idx == 1) && (k < 0))) { scaling = evf;}
 
-  //myfile << " scaling I mean = " << evf << '\n';
- 
-  // if scaling factor different from 1.0...
-  if (evf != 1.0) {
+  // lamina damid with nuclear lamina: need a somehow smaller volume
+  if ((body_idx == 0) && (k < 0)) {scaling = evf * 0.95;}
+  if ((body_idx == 0) && (k > 0)) {scaling = evf;}
 
- 
- 	 // scale grid quantities by factor "evf"
-  	if (body_idx == 0) {
+  if ((body_idx == 1) && (k < 0)) {scaling = evf;}
+  if ((body_idx == 1) && (k > 0)) {scaling = evf / 0.95;}
+  
+  center[0]     =     center[0] * scaling;
+  center[1]     =     center[1] * scaling;
+  center[2]     =     center[2] * scaling;
 
-  		center[0]    = center[0] * evf;
-  		center[1]    = center[1] * evf;
-  		center[2]    = center[2] * evf;
+  origin[0]     =     origin[0] * scaling;
+  origin[1]     =     origin[1] * scaling;
+  origin[2]     =     origin[2] * scaling;
 
-  		origin[0]    = origin[0] * evf;
-  		origin[1]    = origin[1] * evf;
-  		origin[2]    = origin[2] * evf;
+  grid_step[0]  =  grid_step[0] * scaling;
+  grid_step[1]  =  grid_step[1] * scaling;
+  grid_step[2]  =  grid_step[2] * scaling;
+  	
 
-  		grid_step[0] = grid_step[0] * evf;
-  		grid_step[1] = grid_step[1] * evf;
-  		grid_step[2] = grid_step[2] * evf;
-  	}
+  //myfile << center[0] << " " << center[1] << " " << center[2] << "\n";
+  //myfile << origin[0] << " " << origin[1] << " " << origin[2] << "\n";
+  //myfile << grid_step[0] << " " << grid_step[1] << " " << grid_step[2] << "\n";
 
-  	// if nuclear bodies, it is important that the geometric center is preserved
-  	if (body_idx == 1) {
-
-		new_center[0] = center[0]/evf;
-                new_center[1] = center[1]/evf;
-                new_center[2] = center[2]/evf;
-
-  		origin[0]    = origin[0] / evf;
-  		origin[1]    = origin[1] / evf;
-  		origin[2]    = origin[2] / evf;
-
-  		grid_step[0] = grid_step[0] / evf;
-  		grid_step[1] = grid_step[1] / evf;
-  		grid_step[2] = grid_step[2] / evf;
-
-		// translate scaled grid s.t. center is the (non-scaled) nucleolar center
-  		origin[0] = origin[0] + (center[0] - new_center[0]);
-                origin[1] = origin[1] + (center[1] - new_center[1]);
-                origin[2] = origin[2] + (center[2] - new_center[2]);
-	}
-     }
-
-  /*// check something is sto cristo di lettura da file
-   for (int i = 0; i < n_voxel[0]; ++i)
-     {
-         for (int j=0; j < n_voxel[1]; ++j)
-         {
-            for (int k=0; k < n_voxel[2]; ++k)
-            {
-                if (mappa[i][j][k] == 0)
-                {
-                    // print stuff
-                    myfile << i << " " << j << " " << k << " " << mappa[i][j][k] << "\n";
-                    count = count + 1;
-                }
-            }
-         }
-     }
-  myfile  << "number of 0 entries = " << count << "\n";
-  myyfile.close(); */
- myfile.close();
+  //myfile.close();
 
   // this is needed to allocate memory space for the pointers declared in the .h file in the "private" section
   memory->create(this->ftotal, atom->nmax, "FixVolumetricRestraint:ftotal");
@@ -182,7 +151,7 @@ int FixVolumetricRestraint::setmask() {
 
 double FixVolumetricRestraint::memory_usage()
 {
-  int tot_size =  n_voxel[0] * n_voxel[1] * n_voxel[2] * 4;
+  int tot_size =  n_voxel[0] * n_voxel[1] * n_voxel[2] * 5;
   return tot_size * sizeof(float);
 }
 
@@ -219,12 +188,10 @@ void FixVolumetricRestraint::post_force(int vflag)
   int nlocal = atom->nlocal;
 
   // auxiliary vectors
-  double ix_d[3];
-  int    ix[3];
-  //double temp[3] = {0,0,0};
-  //int count = 0;
-
-  double norma;      // to save the norm of an array computed manually
+  double     ix_d[3];    // integer indexes for the voxel where the particle sits
+  int         edt[3];    // integer indexes for the closest EDT (Euclidean Distance Transform) to the particle voxel [ix_d[0], id_x[1], id_x[2]]
+  int          ix[3];    // integer indexes for the voxel where the particle sits (which factors in the possibility of the particle being outside of grid)
+  double       norma;    // to save the norm of an array computed manually
 
   //std::ofstream myfile;
   //myfile.open("debug_forces.txt");
@@ -232,6 +199,7 @@ void FixVolumetricRestraint::post_force(int vflag)
   etotal = 0;
 
   for (int i = 0; i < nlocal; i++) {
+
     ftotal[i] = 0;
     if (mask[i] & groupbit) {
 
@@ -246,7 +214,8 @@ void FixVolumetricRestraint::post_force(int vflag)
       //myfile << " particle voxel # " << ix_d[0] << " " << ix_d[1] << " " << ix_d[2] << "\n";
       //myfile << i << " PRE-FIX " << f[i][0] << " " << f[i][1] << " " << f[i][2] << "\n";
 
-      // account for the possibility of particles floating outside of the density map range
+      // account for the possibility of particles floating outside of the density map range:
+      // if they are, then voxel indexes are negative to immediately recognize them
       ix[0] = ( ix_d[0] >= 0 && ix_d[0] < n_voxel[0] ) ? int(ix_d[0]) : -1;
       ix[1] = ( ix_d[1] >= 0 && ix_d[1] < n_voxel[1] ) ? int(ix_d[1]) : -1;
       ix[2] = ( ix_d[2] >= 0 && ix_d[2] < n_voxel[2] ) ? int(ix_d[2]) : -1;
@@ -254,63 +223,113 @@ void FixVolumetricRestraint::post_force(int vflag)
       //myfile << "particle # " << i << " voxel = " << ix[0] << " " << ix[1] << " " << ix[2] << "\n";
       //myfile << "particle # " << i << " " << mappa[ix[0]][ix[1]][ix[2]] << "\n";
 	
-      //if ((ix[0] < 0 || ix[1] < 0 || ix[2] < 0))
-      //	{	myfile << i << "\n";
-      //	} 
-
-      // IF WE ARE TALKING ABOUT NUCLEAR ENVELOPE
-      if (body_idx == 0)
-	{
+      // volume confinement (exerted by the nuclear lamina, for example)
+      if (body_idx == 0) 
+      {
  
-      	 // if particle is outside of density map range OR inside, but outside of the volume, then apply restraint
-         if ((ix[0] < 0 || ix[1] < 0 || ix[2] < 0) || (mappa[ix[0]][ix[1]][ix[2]] == 1))
-         	{
+         // ----------------------------------------------------------------------------------
+      	 // if particle is outside grid, then apply a radial attraction
+      	 // they are so far away from the envelope that a radial attraction will do just fine
+      	 //
+      	 // OTHERWISE, apply an inward force pointing to each voxel's EDT-mapped image (on the lamina)
+      	 // ----------------------------------------------------------------------------------
+      	 
+      	 // if particle is inside grid (all coordinates are positive), then we have a force given by the distance of its EDT image
+         if (ix[0] >= 0 && ix[1] >= 0 && ix[2] >= 0) {
 
-	      norma = sqrt((x[i][0] - center[0]) * (x[i][0] - center[0]) + 
-                           (x[i][1] - center[1]) * (x[i][1] - center[1]) + 
-                           (x[i][2] - center[2]) * (x[i][2] - center[2])
-                          );
+              // if the particle is outside the nuclear volume and we have k >0 (VOLUME) OR inside the volume and we have k<0 (DAMID):
+              if ( ((mappa[ix[0]][ix[1]][ix[2]][3] == 0) && (k > 0)) || ((mappa[ix[0]][ix[1]][ix[2]][3] != 0) && (k < 0)))
+                {
+			// find the EDT image of the voxel the locus is currently in
 
-              ftotal[i] = norm3(f[i]);
-              etotal    += kspring * norma;
+              		edt[0] = mappa[ix[0]][ix[1]][ix[2]][0];
+              		edt[1] = mappa[ix[0]][ix[1]][ix[2]][1];
+              		edt[2] = mappa[ix[0]][ix[1]][ix[2]][2];
 
-              f[i][0] += kspring * (center[0] - x[i][0]) / norma;
-              f[i][1] += kspring * (center[1] - x[i][1]) / norma;
-              f[i][2] += kspring * (center[2] - x[i][2]) / norma;
+	      		norma = sqrt(  grid_step[0] * grid_step[0] * (edt[0] - ix[0]) * (edt[0] - ix[0]) +
+              		               grid_step[1] * grid_step[1] * (edt[1] - ix[1]) * (edt[1] - ix[1]) +
+              		               grid_step[2] * grid_step[2] * (edt[2] - ix[2]) * (edt[2] - ix[2]) 
+              		             );
 
-	        }
-         }
+              		ftotal[i] = k * k * norma; 
+              		etotal    += k * k * norma * norma; 
 
-      // IF WE ARE TALKING ABOUT NUCLEAR BODY
-      if (body_idx == 1)
-	 {
-	  if ((ix[0] >= 0 && ix[1] >=0 && ix[2] >=0) && (mappa[ix[0]][ix[1]][ix[2]] == 1))
-		{
-	      norma = sqrt((x[i][0] - center[0]) * (x[i][0] - center[0]) +
+                      	f[i][0] += k * k * (edt[0] - ix[0])/n_voxel[0]; // * grid_step[0] * (edt_image[0] - ix[0])/norma;
+                      	f[i][1] += k * k * (edt[1] - ix[1])/n_voxel[1]; // * grid_step[1] * (edt_image[1] - ix[1])/norma;
+                      	f[i][2] += k * k * (edt[2] - ix[2])/n_voxel[2]; // * grid_step[2] * (edt_image[2] - ix[2])/norma;
+
+		 }
+              }
+         
+         // if particle is partially outside of the unitary cell, then a unitary radial attractive force will do the trick
+         else if (k > 0) {
+              // if volume, otherwise no force
+              norma = sqrt((x[i][0] - center[0]) * (x[i][0] - center[0]) +
                            (x[i][1] - center[1]) * (x[i][1] - center[1]) +
                            (x[i][2] - center[2]) * (x[i][2] - center[2])
                           );
 
-              ftotal[i] =  norm3(f[i]);
-              etotal    += kspring * norma;
+              ftotal[i] = norm3(f[i]);
+              etotal    += k / 2;
 
-              f[i][0] += kspring * (x[i][0] - center[0]) / norma;
-              f[i][1] += kspring * (x[i][1] - center[1]) / norma;
-              f[i][2] += kspring * (x[i][2] - center[2]) / norma;
-		
-		}
-	 }
-    
-        //myfile << i << " POST-FIX " << f[i][0] << " " << f[i][1] << " " << f[i][2] << "\n\n";
- 
-    }
+              f[i][0] += k * (center[0] - x[i][0]) / norma;
+              f[i][1] += k * (center[1] - x[i][1]) / norma;
+              f[i][2] += k * (center[2] - x[i][2]) / norma;
+
+	       }                                                
+      }
+
+      // IF WE ARE TALKING ABOUT NUCLEAR BODY
+      if (body_idx == 1)
+      {
+
+          // if inside the volume grid and inside the reference volume, apply expulsion/excluded force
+	  if (ix[0] >= 0 && ix[1] >=0 && ix[2] >=0)
+          {
+              // ... outside nucleolar volume but to be attracted back to surface (lamina) or inside volume to be expelled
+              if (((mappa[ix[0]][ix[1]][ix[2]][3] == 1) && (k >0)) || ((mappa[ix[0]][ix[1]][ix[2]][3] == 0) && (k <0)))
+	      {
+
+              		edt[0] = mappa[ix[0]][ix[1]][ix[2]][0];
+                	edt[1] = mappa[ix[0]][ix[1]][ix[2]][1];
+                	edt[2] = mappa[ix[0]][ix[1]][ix[2]][2];
+              
+                	norma = sqrt( grid_step[0] * grid_step[0] * (edt[0] - ix[0]) * (edt[0] - ix[0]) +
+                              	      grid_step[1] * grid_step[1] * (edt[1] - ix[1]) * (edt[1] - ix[1]) +
+                                      grid_step[2] * grid_step[2] * (edt[2] - ix[2]) * (edt[2] - ix[2])
+                                    );
+              
+                	ftotal[i] = k * k * norma;
+                	etotal    += k * k * norma * norma;
+
+                   	f[i][0] += k * k * (edt[0] - ix[0])/n_voxel[0]; //]* grid_step[0] * (edt_image[0] - ix[0])/norma;
+                   	f[i][1] += k * k * (edt[1] - ix[1])/n_voxel[1]; //grid_step[1] * (edt_image[1] - ix[1])/norma;
+                   	f[i][2] += k * k * (edt[2] - ix[2])/n_voxel[2]; //grid_step[2] * (edt_image[2] - ix[2])/norma;
+	      }
+	  }
+          else if (k < 0)
+                {
+                norma =  sqrt((x[i][0] - center[0]) * (x[i][0] - center[0]) +
+                              (x[i][1] - center[1]) * (x[i][1] - center[1]) +
+                              (x[i][2] - center[2]) * (x[i][2] - center[2])
+                          );
+
+              ftotal[i] = norm3(f[i]);
+              etotal    += k / 2;
+
+              f[i][0] += k * k * (center[0] - x[i][0]) / norma;
+              f[i][1] += k * k * (center[1] - x[i][1]) / norma;
+              f[i][2] += k * k * (center[2] - x[i][2]) / norma;
+                }
+     }
 
   }
+}
 
  // myfile << "\n\n\n";
  // myfile << " number of particles outside = " << count << "\n";
 
- // myfile.close();
+  //myfile.close();
 }
 
 /* ---------------------------------------------------------------------- */

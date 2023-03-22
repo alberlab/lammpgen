@@ -40,16 +40,24 @@ class FixVolumetricRestraint : public Fix {
   double compute_vector(int);
 
  private:
-  double      kspring, evf;  // elastic constant, factor to scale up/down any nuclear/nucleolar envelope
-  double    origin[3];   // [x_min, y_min, z_min] origin, lowest, leftmost vertex for the volume map
-  double grid_step[3]; // [dx, dy, dz] grid spacing along the three dimensions
-  double    center[3];    // geometric center of the nuclear body, pozzo del campo centrale di forza
-  int      n_voxel[3];    // number of voxels along the three dimensions
-  int        body_idx;     // index to discriminate between nuclear envelope and/ord nuclear bodies
+  double            k, evf;  // elastic constant, factor to scale up/down any nuclear/nucleolar envelope
+  double         origin[3];   // [x_min, y_min, z_min] origin, lowest, leftmost vertex for the volume map
+  double      grid_step[3]; // [dx, dy, dz] grid spacing (aka, voxel size) along the x, y and z binning
+  double         center[3];    // geometric center of the nuclear body, pozzo del campo centrale di forza
+  int           n_voxel[3];    // number of voxels along the three dimensions
+  int             body_idx;     // index to discriminate between nuclear envelope and/ord nuclear bodies
  
-  double mappa[220][150][45];   // per il momento e' inizializzata in eccesso...cioe' e' piu' grande di quello che serve
-  double etotal;
-  double* ftotal;
+  int               mappa[500][410][120][4];   // per il momento e' inizializzata in eccesso...cioe' e' piu' grande di quello che serve (dynamic stuff)?
+					       // dynamic allocation is possible using pointers of pointers etc...but it will be much slower than just 
+					       // initializing a larger-than-needed static array.
+					       // Guido's version used dynamic allocation: see "fix_volumetric_smart.cpp" in /u/home/b/bonimba/lammps_
+					       // spare_code for the code to allocate and de-allocate dynamically, after nvoxel array is read in.
+					       // Also, it might help improve performance and data storage if we used a c++ libray to read npz files.
+					       // Instead of plain txt files. This is a technical improvement.
+
+
+  double            etotal;
+  double*           ftotal;
 };
 
 }
